@@ -52,3 +52,16 @@ results = run_fullport_debug_check;
 3. 보상/모델 함수
 4. EKF/NEKF/MPF
 5. 시각화/리포팅
+
+## 원본 Julia에서 항법 실행하는 기준 엔트리포인트
+
+현재 원본 MagNav 항법의 사실상 메인 엔트리포인트는 `run_filt(...)` 입니다.
+
+빠른 검증은 아래로 실행하세요:
+
+```bash
+julia --project=. examples/navigation_entrypoint.jl
+```
+
+이 스크립트는 리포지토리의 테스트 데이터(`test/test_data/*.mat`)를 로드해서
+`run_filt(..., :ekf)`를 실제로 돌립니다.
