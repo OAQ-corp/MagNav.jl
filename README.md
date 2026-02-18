@@ -45,7 +45,7 @@ julia> using MagNav
 
 ### MATLAB migration support
 
-An incremental MATLAB port has started in the [`matlab`](matlab) folder. It currently includes curated MATLAB DCM/Euler utilities (`+magnav`) plus a full-code mechanical draft export (`+magnav_fullport`) generated from `src/*.jl` for staged migration.
+An incremental MATLAB port has started in the [`matlab`](matlab) folder. It includes curated MATLAB DCM/Euler utilities (`+magnav`) plus an auto-generated full-code draft export (`+magnav_fullport`) from `src/*.jl`, along with debug/check instructions for staged hardening.
 
 ### Examples
 

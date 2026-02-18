@@ -1,7 +1,8 @@
 % Auto-generated from src/ekf_&_crlb.jl
 % Original Julia signature: function ekf(lat, lon, alt, vn, ve, vd, fn, fe, fd, Cnb, meas, dt, itp_mapS; P0         = create_P0(),
-% Mechanical conversion draft: review before production use.
+% Executable draft: unsupported Julia-specific lines are commented with TODO.
 function out = ekf(lat, lon, alt, vn, ve, vd, fn, fe, fd, Cnb, meas, dt, itp_mapS, varargin)
+    out = [];
              P0         = create_P0(),
              Qd         = create_Qd(),
              R          = 1.0,
@@ -10,8 +11,8 @@ function out = ekf(lat, lon, alt, vn, ve, vd, fn, fe, fd, Cnb, meas, dt, itp_map
              gyro_tau   = 3600.0,
              fogm_tau   = 600.0,
              date       = get_years(2020,185),
-             core::Bool = false,
-             der_mapS   = nothing,
+% TODO(Julia->MATLAB): core::Bool = false,
+             der_mapS   = [],
              map_alt    = 0)
 
     N     = length(lat)

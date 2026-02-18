@@ -1,15 +1,16 @@
 % Auto-generated from src/tolles_lawson.jl
 % Original Julia signature: function create_TL_coef(Bx, By, Bz, B; Bt         = sqrt.(Bx.^2+By.^2+Bz.^2),
-% Mechanical conversion draft: review before production use.
+% Executable draft: unsupported Julia-specific lines are commented with TODO.
 function out = create_TL_coef(Bx, By, Bz, B, varargin)
-                        Bt         = sqrt.(Bx.^2+By.^2+Bz.^2),
+    out = [];
+                        Bt         = sqrt(Bx.^2+By.^2+Bz.^2),
                         λ          = 0,
-                        terms      = [:permanent,:induced,:eddy],
+% TODO(Julia->MATLAB): terms      = [:permanent,:induced,:eddy],
                         pass1      = 0.1,
                         pass2      = 0.9,
                         fs         = 10.0,
-                        pole::Int  = 4,
-                        trim::Int  = 20,
+% TODO(Julia->MATLAB): pole::Int  = 4,
+% TODO(Julia->MATLAB): trim::Int  = 20,
                         Bt_scale   = 50000,
                         return_var = false)
 

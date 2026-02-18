@@ -1,7 +1,8 @@
 % Auto-generated from src/analysis_util.jl
 % Original Julia signature: function get_bpf(; pass1 = 0.1, pass2 = 0.9, fs = 10.0, pole::Int = 4)
-% Mechanical conversion draft: review before production use.
+% Executable draft: unsupported Julia-specific lines are commented with TODO.
 function out = get_bpf(varargin)
+    out = [];
     if     ((pass1 >  0) & (pass1 <  fs/2)) & ((pass2 >  0) & (pass2 <  fs/2))
         p = Bandpass(pass1,pass2) % bandpass
     elseif ((pass1 <= 0) | (pass1 >= fs/2)) & ((pass2 >  0) & (pass2 <  fs/2))
@@ -9,6 +10,6 @@ function out = get_bpf(varargin)
     elseif ((pass1 >  0) & (pass1 <  fs/2)) & ((pass2 <= 0) | (pass2 >= fs/2))
         p = Highpass(pass1)       % high-pass
     else
-        error("$pass1 & $pass2 passband frequencies are invalid")
+% TODO(Julia->MATLAB): error("$pass1 & $pass2 passband frequencies are invalid")
     end
 end

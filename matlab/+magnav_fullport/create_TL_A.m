@@ -1,9 +1,10 @@
 % Auto-generated from src/tolles_lawson.jl
 % Original Julia signature: function create_TL_A(Bx, By, Bz; Bt       = sqrt.(Bx.^2+By.^2+Bz.^2),
-% Mechanical conversion draft: review before production use.
+% Executable draft: unsupported Julia-specific lines are commented with TODO.
 function out = create_TL_A(Bx, By, Bz, varargin)
-                     Bt       = sqrt.(Bx.^2+By.^2+Bz.^2),
-                     terms    = [:permanent,:induced,:eddy],
+    out = [];
+                     Bt       = sqrt(Bx.^2+By.^2+Bz.^2),
+% TODO(Julia->MATLAB): terms    = [:permanent,:induced,:eddy],
                      Bt_scale = 50000,
                      return_B = false)
 
@@ -48,7 +49,7 @@ function out = create_TL_A(Bx, By, Bz, varargin)
     A = Matrix{eltype(Bt)}(undef,length(Bt),0)
 
     % add (3) permanent field terms - all
-    if any([:permanent,:p,:permanent3,:p3] .∈ (terms,))
+% TODO(Julia->MATLAB): if any([:permanent,:p,:permanent3,:p3] .∈ (terms,))
     	A = [A Bx_hat By_hat Bz_hat]
     end
 end

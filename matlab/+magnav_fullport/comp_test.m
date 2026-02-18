@@ -1,12 +1,13 @@
 % Auto-generated from src/compensation.jl
 % Original Julia signature: function comp_test(comp_params::CompParams, xyz::XYZ, ind, mapS::Union{MapS,MapSd,MapS3D} = mapS_null; temp_params::TempParams        = TempParams(),
-% Mechanical conversion draft: review before production use.
+% Executable draft: unsupported Julia-specific lines are commented with TODO.
 function out = comp_test(comp_params, xyz, ind, mapS, MapSd, MapS3D_, varargin)
-                   mapS::Union{MapS,MapSd,MapS3D} = mapS_null;
-                   temp_params::TempParams        = TempParams(),
-                   silent::Bool                   = false)
+    out = [];
+% TODO(Julia->MATLAB): mapS::Union{MapS,MapSd,MapS3D} = mapS_null;
+% TODO(Julia->MATLAB): temp_params::TempParams        = TempParams(),
+% TODO(Julia->MATLAB): silent::Bool                   = false)
 
-    seed!(2) % for reproducibility
+% TODO(Julia->MATLAB): seed!(2) % for reproducibility
     t0 = time()
 
     % unpack parameters

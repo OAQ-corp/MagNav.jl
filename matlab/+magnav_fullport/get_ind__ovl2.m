@@ -1,13 +1,14 @@
 % Auto-generated from src/analysis_util.jl
 % Original Julia signature: function get_ind(xyz::XYZ; ind    = trues(xyz.traj.N),
-% Mechanical conversion draft: review before production use.
+% Executable draft: unsupported Julia-specific lines are commented with TODO.
 function out = get_ind__ovl2(xyz, varargin)
+    out = [];
                  ind    = trues(xyz.traj.N),
                  lines  = (),
                  tt_lim = (),
                  splits = (1))
     fields = fieldnames(typeof(xyz))
-    line_  = :line in fields ? xyz.line : one.(xyz.traj.tt[ind])
+% TODO(Julia->MATLAB): line_  = :line in fields ? xyz.line : one(xyz.traj.tt(ind))
     get_ind(xyz.traj.tt,line_;
             ind    = ind,
             lines  = lines,

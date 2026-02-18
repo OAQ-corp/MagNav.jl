@@ -1,7 +1,8 @@
 % Auto-generated from src/model_functions.jl
 % Original Julia signature: function create_Qd(dt = 0.1; VRW_sigma        = 0.000238, ARW_sigma        = 0.000000581, baro_sigma       = 1.0, acc_sigma        = 0.000245, gyro_sigma       = 0.00000000727, fogm_sigma       = 3.0, vec_sigma        = 1000.0, TL_sigma         = [], baro_tau         = 3600.0, acc_tau          = 3600.0, gyro_tau         = 3600.0, fogm_tau         = 600.0, vec_states::Bool = false, fogm_state::Bool = true)
-% Mechanical conversion draft: review before production use.
+% Executable draft: unsupported Julia-specific lines are commented with TODO.
 function Qd = create_Qd(dt, varargin)
+    Qd = [];
                    VRW_sigma        = 0.000238,
                    ARW_sigma        = 0.000000581,
                    baro_sigma       = 1.0,
@@ -14,8 +15,8 @@ function Qd = create_Qd(dt, varargin)
                    acc_tau          = 3600.0,
                    gyro_tau         = 3600.0,
                    fogm_tau         = 600.0,
-                   vec_states::Bool = false,
-                   fogm_state::Bool = true)
+% TODO(Julia->MATLAB): vec_states::Bool = false,
+% TODO(Julia->MATLAB): fogm_state::Bool = true)
 
     VRW_var    = VRW_sigma^2    % velocity random walk noise variance
     ARW_var    = ARW_sigma^2    % angular  random walk noise variance
@@ -42,11 +43,12 @@ function Qd = create_Qd(dt, varargin)
     i1 = 18
     i2 = i1 + nx_TL
     i3 = i2 + nx_vec
-    nx_TL   > 0 && (Q[i1:i2-1] = vec(TL_var))
-    nx_vec  > 0 && (Q[i2:i3-1] = repeat([vec_var],3))
-    nx_fogm > 0 && (Q[i3     ] = fogm_drive)
+% TODO(Julia->MATLAB): nx_TL   > 0 && (Q(i1:i2-1) = vec(TL_var))
+% TODO(Julia->MATLAB): nx_vec  > 0 && (Q(i2:i3-1) = repeat([vec_var],3))
+    nx_fogm > 0 && (Q(i3     ) = fogm_drive)
 
     Qd = Diagonal(Q)*dt % discrete time process/system noise matrix
 
+% return (Qd)
 end % function create_Qd
 end

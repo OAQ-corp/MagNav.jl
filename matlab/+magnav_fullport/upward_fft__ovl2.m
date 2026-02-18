@@ -1,7 +1,8 @@
 % Auto-generated from src/map_fft.jl
 % Original Julia signature: function upward_fft(map_map::Map, alt; expand::Bool = true, α = 0)
-% Mechanical conversion draft: review before production use.
+% Executable draft: unsupported Julia-specific lines are commented with TODO.
 function out = upward_fft__ovl2(map_map, alt, varargin)
+    out = [];
 
     N_alt = length(alt)
 

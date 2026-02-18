@@ -1,30 +1,31 @@
 % Auto-generated from src/eval_filt.jl
 % Original Julia signature: function gif_ellipse(P, lat1 = deg2rad(45);
-% Mechanical conversion draft: review before production use.
+% Executable draft: unsupported Julia-specific lines are commented with TODO.
 function out = gif_ellipse(P, lat1)
+    out = [];
                      dt                   = 0.1,
-                     di::Int              = 10,
-                     speedup::Int         = 60,
-                     conf_units::Symbol   = :m,
+% TODO(Julia->MATLAB): di::Int              = 10,
+% TODO(Julia->MATLAB): speedup::Int         = 60,
+% TODO(Julia->MATLAB): conf_units::Symbol   = :m,
                      μ                    = zeros(eltype(P),2),
                      conf                 = 0.95,
                      clip                 = Inf,
-                     n::Int               = 61,
+% TODO(Julia->MATLAB): n::Int               = 61,
                      lim                  = 500,
-                     margin::Int          = 2,
-                     axis::Bool           = true,
-                     plot_eigax::Bool     = false,
-                     bg_color::Symbol     = :white,
-                     ce_color::Symbol     = :black,
-                     b_e::AbstractBackend = gr(),
-                     save_plot::Bool      = false,
-                     ellipse_gif::String  = "conf_ellipse.gif")
+% TODO(Julia->MATLAB): margin::Int          = 2,
+% TODO(Julia->MATLAB): axis::Bool           = true,
+% TODO(Julia->MATLAB): plot_eigax::Bool     = false,
+% TODO(Julia->MATLAB): bg_color::Symbol     = :white,
+% TODO(Julia->MATLAB): ce_color::Symbol     = :black,
+% TODO(Julia->MATLAB): b_e::AbstractBackend = gr(),
+% TODO(Julia->MATLAB): save_plot::Bool      = false,
+% TODO(Julia->MATLAB): ellipse_gif::String  = "conf_ellipse.gif")
 
     P  = units_ellipse(P;conf_units=conf_units,lat1=lat1)
     a1 = Animation()
 
-    for i = 1:di:size(P,3)
-        p1 = conf_ellipse(P[:,:,i];
+% TODO(Julia->MATLAB): for i = 1:di:size(P,3)
+        p1 = conf_ellipse(P(:,:,i);
                           μ          = μ,
                           conf       = conf,
                           clip       = clip,

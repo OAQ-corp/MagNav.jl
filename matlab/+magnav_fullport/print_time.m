@@ -1,10 +1,11 @@
 % Auto-generated from src/compensation.jl
 % Original Julia signature: function print_time(t::Real, digits::Int = 1)
-% Mechanical conversion draft: review before production use.
+% Executable draft: unsupported Julia-specific lines are commented with TODO.
 function out = print_time(t, digits)
+    out = [];
     if t < 60
-        @info("time: $(round(t   ,digits=digits)) sec")
+% TODO(Julia->MATLAB): @info("time: $(round(t   ,digits=digits)) sec")
     else
-        @info("time: $(round(t/60,digits=digits)) min")
+% TODO(Julia->MATLAB): @info("time: $(round(t/60,digits=digits)) min")
     end
 end

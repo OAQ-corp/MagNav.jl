@@ -1,9 +1,10 @@
 % Auto-generated from src/map_functions.jl
 % Original Julia signature: function map_chessboard!(map_map::Matrix, map_alt::Matrix, map_xx::Vector, map_yy::Vector, alt::Real; down_cont::Bool = true, dz              = 5, down_max        = 150, α               = 200)
-% Mechanical conversion draft: review before production use.
+% Executable draft: unsupported Julia-specific lines are commented with TODO.
 function out = map_chessboard_bang(map_map, map_alt, map_xx, map_yy, alt, varargin)
-                         map_yy::Vector, alt::Real;
-                         down_cont::Bool = true,
+    out = [];
+% TODO(Julia->MATLAB): map_yy::Vector, alt::Real;
+% TODO(Julia->MATLAB): down_cont::Bool = true,
                          dz              = 5,
                          down_max        = 150,
                          α               = 200)
@@ -19,19 +20,19 @@ function out = map_chessboard_bang(map_map, map_alt, map_xx, map_yy, alt, vararg
     dx = get_step(map_xx)
     dy = get_step(map_yy)
 
-    alt_min = floor(minimum(map_alt[ind1]))
-    alt_max = ceil( maximum(map_alt[ind1]))
+    alt_min = floor(minimum(map_alt(ind1)))
+    alt_max = ceil( maximum(map_alt(ind1)))
 
     up_max = 500
-    alt_max - alt > down_max && @info("limiting downward continuation to alt_max = $alt_max m - $down_max m for chessboard method")
-    alt - alt_min > up_max   && @info("limiting upward continuation to alt_min = $alt_min m + $up_max m for chessboard method")
+% TODO(Julia->MATLAB): alt_max - alt > down_max && @info("limiting downward continuation to alt_max = $alt_max m - $down_max m for chessboard method")
+% TODO(Julia->MATLAB): alt - alt_min > up_max   && @info("limiting upward continuation to alt_min = $alt_min m + $up_max m for chessboard method")
     alt_dif_down = clamp(alt_max - alt, 0, down_max)
     alt_dif_up   = clamp(alt - alt_min, 0, up_max)
-    alt_lev_down = 0:dz:alt_dif_down+dz % downward continuation levels
-    alt_lev_up   = 0:dz:alt_dif_up+dz   % upward   continuation levels
+% TODO(Julia->MATLAB): alt_lev_down = 0:dz:alt_dif_down+dz % downward continuation levels
+% TODO(Julia->MATLAB): alt_lev_up   = 0:dz:alt_dif_up+dz   % upward   continuation levels
 
     if down_cont
-        alt_lev = -alt_lev_down[end]:dz:alt_lev_up[end]
+% TODO(Julia->MATLAB): alt_lev = -alt_lev_down(end):dz:alt_lev_up(end)
         k0 = length(alt_lev_down)
     else
         alt_lev = alt_lev_up

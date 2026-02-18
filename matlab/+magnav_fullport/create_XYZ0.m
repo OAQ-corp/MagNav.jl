@@ -1,21 +1,22 @@
 % Auto-generated from src/create_XYZ.jl
 % Original Julia signature: function create_XYZ0(mapS::Union{MapS,MapSd,MapS3D} = get_map(namad);
-% Mechanical conversion draft: review before production use.
+% Executable draft: unsupported Julia-specific lines are commented with TODO.
 function out = create_XYZ0(mapS, MapSd, MapS3D_)
+    out = [];
                      alt            = 1000,
                      dt             = 0.1,
                      t              = 300,
                      v              = 68,
-                     ll1::Tuple     = (), % (0.54, -1.44)
-                     ll2::Tuple     = (), % (0.55, -1.45)
-                     N_waves::Int   = 1,
-                     attempts::Int  = 10,
-                     info::String   = "Simulated data",
+% TODO(Julia->MATLAB): ll1::Tuple     = (), % (0.54, -1.44)
+% TODO(Julia->MATLAB): ll2::Tuple     = (), % (0.55, -1.45)
+% TODO(Julia->MATLAB): N_waves::Int   = 1,
+% TODO(Julia->MATLAB): attempts::Int  = 10,
+% TODO(Julia->MATLAB): info::String   = "Simulated data",
                      flight         = 1,
                      line           = 1,
                      year           = 2023,
                      doy            = 154,
-                     mapV::MapV     = get_map(emm720),
+% TODO(Julia->MATLAB): mapV::MapV     = get_map(emm720),
                      cor_sigma      = 1.0,
                      cor_tau        = 600.0,
                      cor_var        = 1.0^2,
@@ -39,9 +40,9 @@ function out = create_XYZ0(mapS, MapSd, MapS3D_)
                      acc_tau        = 3600.0,
                      gyro_tau       = 3600.0,
                      fogm_tau       = 600.0,
-                     save_h5::Bool  = false,
-                     xyz_h5::String = "xyz_data.h5",
-                     silent::Bool   = false)
+% TODO(Julia->MATLAB): save_h5::Bool  = false,
+% TODO(Julia->MATLAB): xyz_h5::String = "xyz_data.h5",
+% TODO(Julia->MATLAB): silent::Bool   = false)
 
     xyz_h5 = add_extension(xyz_h5,".h5")
 
@@ -102,22 +103,22 @@ function out = create_XYZ0(mapS, MapSd, MapS3D_)
                                        cor_ind_mag  = cor_ind_mag,
                                        cor_eddy_mag = cor_eddy_mag)
 
-    flights = flight*one.(traj.lat)
-    lines   = line  *one.(traj.lat)
-    years   = year  *one.(traj.lat)
-    doys    = doy   *one.(traj.lat)
+    flights = flight*one(traj.lat)
+    lines   = line  *one(traj.lat)
+    years   = year  *one(traj.lat)
+    doys    = doy   *one(traj.lat)
 
-    igrf = zero.(traj.lat)
+    igrf = zero(traj.lat)
     xyz  = XYZ0(info, traj, ins, flux_a, flights, lines,
                 years, doys, diurnal, igrf, mag_1_c, mag_1_uc)
-    igrf = norm.(get_igrf(xyz;
-                          frame     = :body,
+    igrf = norm(get_igrf(xyz;
+% TODO(Julia->MATLAB): frame     = :body,
                           norm_igrf = false,
                           check_xyz = false))
-    xyz.igrf .= igrf
+    xyz.igrf = igrf
 
     if save_h5 % save `xyz_h5`
-        h5open(xyz_h5,"cw") do file % read-write, create file if not existing, preserve existing contents
+% TODO(Julia->MATLAB): h5open(xyz_h5,"cw") do file % read-write, create file if not existing, preserve existing contents
             write(file,"flux_a_x",flux_a.x)
             write(file,"flux_a_y",flux_a.y)
             write(file,"flux_a_z",flux_a.z)

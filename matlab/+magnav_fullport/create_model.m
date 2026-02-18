@@ -1,7 +1,8 @@
 % Auto-generated from src/model_functions.jl
 % Original Julia signature: function create_model(dt = 0.1, lat1 = deg2rad(45);
-% Mechanical conversion draft: review before production use.
+% Executable draft: unsupported Julia-specific lines are commented with TODO.
 function [P0, Qd, R] = create_model(dt, lat1)
+    P0 = [];
                       init_pos_sigma   = 3.0,
                       init_alt_sigma   = 0.001,
                       init_vel_sigma   = 0.01,
@@ -21,8 +22,8 @@ function [P0, Qd, R] = create_model(dt, lat1)
                       acc_tau          = 3600.0,
                       gyro_tau         = 3600.0,
                       fogm_tau         = 600.0,
-                      vec_states::Bool = false,
-                      fogm_state::Bool = true,
+% TODO(Julia->MATLAB): vec_states::Bool = false,
+% TODO(Julia->MATLAB): fogm_state::Bool = true,
                       P0_TL            = [])
 
     P0 = create_P0(lat1;
@@ -58,5 +59,6 @@ function [P0, Qd, R] = create_model(dt, lat1)
 
     R = meas_var % measurement (white) noise variance [nT^2]
 
+% return (P0, Qd, R)
 end % function create_model
 end

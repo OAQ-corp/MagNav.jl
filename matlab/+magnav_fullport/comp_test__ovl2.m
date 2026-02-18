@@ -1,12 +1,13 @@
 % Auto-generated from src/compensation.jl
 % Original Julia signature: function comp_test(comp_params::CompParams, lines, df_line::DataFrame, df_flight::DataFrame, df_map::DataFrame; temp_params::TempParams = TempParams(),
-% Mechanical conversion draft: review before production use.
+% Executable draft: unsupported Julia-specific lines are commented with TODO.
 function out = comp_test__ovl2(comp_params, lines, df_line, df_flight, df_map, varargin)
-                   df_line::DataFrame, df_flight::DataFrame, df_map::DataFrame;
-                   temp_params::TempParams = TempParams(),
-                   silent::Bool            = false)
+    out = [];
+% TODO(Julia->MATLAB): df_line::DataFrame, df_flight::DataFrame, df_map::DataFrame;
+% TODO(Julia->MATLAB): temp_params::TempParams = TempParams(),
+% TODO(Julia->MATLAB): silent::Bool            = false)
 
-    seed!(2) % for reproducibility
+% TODO(Julia->MATLAB): seed!(2) % for reproducibility
     t0 = time()
 
     % unpack parameters

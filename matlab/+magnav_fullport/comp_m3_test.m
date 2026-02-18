@@ -1,12 +1,13 @@
 % Auto-generated from src/compensation.jl
 % Original Julia signature: function comp_m3_test(comp_params::NNCompParams, lines, df_line::DataFrame, df_flight::DataFrame, df_map::DataFrame; temp_params::TempParams = TempParams(),
-% Mechanical conversion draft: review before production use.
+% Executable draft: unsupported Julia-specific lines are commented with TODO.
 function out = comp_m3_test(comp_params, lines, df_line, df_flight, df_map, varargin)
-                      df_line::DataFrame, df_flight::DataFrame, df_map::DataFrame;
-                      temp_params::TempParams = TempParams(),
-                      silent::Bool            = false)
+    out = [];
+% TODO(Julia->MATLAB): df_line::DataFrame, df_flight::DataFrame, df_map::DataFrame;
+% TODO(Julia->MATLAB): temp_params::TempParams = TempParams(),
+% TODO(Julia->MATLAB): silent::Bool            = false)
 
-    seed!(2) % for reproducibility
+% TODO(Julia->MATLAB): seed!(2) % for reproducibility
     t0 = time()
 
     % unpack parameters
@@ -20,11 +21,11 @@ function out = comp_m3_test(comp_params, lines, df_line, df_flight, df_map, vara
     @unpack σ_curriculum, l_window, window_type, tf_layer_type, tf_norm_type,
     dropout_prob, N_tf_head, tf_gain = temp_params
 
-    assert y_type in [:a,:b,:c,:d] "unsupported y_type = $y_type for nn_comp_3"
-    assert model_type in [:m3s,:m3v,:m3sc,:m3vc,:m3w,:m3tf] "unsupported model_type = $model_type for model 3 explainability"
+% TODO(Julia->MATLAB): assert y_type in [:a,:b,:c,:d] "unsupported y_type = $y_type for nn_comp_3"
+% TODO(Julia->MATLAB): assert model_type in [:m3s,:m3v,:m3sc,:m3vc,:m3w,:m3tf] "unsupported model_type = $model_type for model 3 explainability"
 
-    mod_TL = model_type == :mod_TL ? true : false
-    map_TL = model_type == :map_TL ? true : false
+% TODO(Julia->MATLAB): mod_TL = model_type == :mod_TL ? true : false
+% TODO(Julia->MATLAB): map_TL = model_type == :map_TL ? true : false
 
     (A,Bt,B_dot,x,y,_,features,l_segs) = get_Axy(lines,df_line,df_flight,df_map,
                                                  features_setup;
@@ -44,30 +45,30 @@ function out = comp_m3_test(comp_params, lines, df_line, df_flight, df_map, vara
                                                  silent           = silent_debug)
 
     % convert to Float32 for consistency with nn_comp_3_train
-    A       = Float32.(A)
-    Bt      = Float32.(Bt)    % magnitude of total field measurements
-    B_dot   = Float32.(B_dot) % finite differences of total field vector
-    x       = Float32.(x)
-    y       = Float32.(y)
-    TL_coef = Float32.(TL_coef)
+    A       = Float32(A)
+    Bt      = Float32(Bt)    % magnitude of total field measurements
+    B_dot   = Float32(B_dot) % finite differences of total field vector
+    x       = Float32(x)
+    y       = Float32(y)
+    TL_coef = Float32(TL_coef)
 
     % assume all terms are stored, but they may be zero if not trained
     Bt_scale = 50000f0
     (TL_coef_p,TL_coef_i,TL_coef_e) = TL_vec2mat(TL_coef,terms_A;Bt_scale=Bt_scale)
 
-    B_unit    = A[:,1:3]'     % normalized vector magnetometer reading
-    B_vec     = B_unit .* Bt' % vector magnetometer to be used in TL
+    B_unit    = A(:,1:3)'     % normalized vector magnetometer reading
+% TODO(Julia->MATLAB): B_vec     = B_unit .* Bt' % vector magnetometer to be used in TL
     B_vec_dot = B_dot'        % not exactly true, but internally consistent
 
     % unpack data normalizations
     (_,_,v_scale,x_bias,x_scale,y_bias,y_scale) = unpack_data_norms(data_norms)
     x_norm = (((x .- x_bias) ./ x_scale) * v_scale)'
 
-    model_type in [:m3w,:m3tf] && (x_norm = get_temporal_data(x_norm,l_segs,l_window))
+% TODO(Julia->MATLAB): model_type in [:m3w,:m3tf] && (x_norm = get_temporal_data(x_norm,l_segs,l_window))
 
-    % set to test mode in case model uses batchnorm or dropout
+% TODO(Julia->MATLAB): % set to test mode in case model uses batchnorm or dropout
     m = model
-    Flux.testmode!(m)
+% TODO(Julia->MATLAB): Flux.testmode!(m)
 
     % calculate TL vector field
     (TL_aircraft,TL_perm,TL_induced,TL_eddy) =
@@ -75,10 +76,10 @@ function out = comp_m3_test(comp_params, lines, df_line, df_flight, df_map, vara
                             return_parts=true)
 
     % compute neural network correction
-    if model_type in [:m3s,:m3sc,:m3w,:m3tf] % scalar-corrected
+% TODO(Julia->MATLAB): if model_type in [:m3s,:m3sc,:m3w,:m3tf] % scalar-corrected
         y_nn = vec(m(x_norm)) .* y_scale % rescale to TL [N]
         y_nn = y_nn' .* B_unit % assume same direction [3xN]
-    elseif model_type in [:m3v,:m3vc] % vector-corrected
+% TODO(Julia->MATLAB): elseif model_type in [:m3v,:m3vc] % vector-corrected
         y_nn = m(x_norm) .* y_scale % rescale to TL [3xN]
     end
 end

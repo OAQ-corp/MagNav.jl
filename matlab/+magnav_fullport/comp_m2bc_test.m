@@ -1,11 +1,12 @@
 % Auto-generated from src/compensation.jl
 % Original Julia signature: function comp_m2bc_test(comp_params::NNCompParams, lines, df_line::DataFrame, df_flight::DataFrame, df_map::DataFrame; silent::Bool = false)
-% Mechanical conversion draft: review before production use.
+% Executable draft: unsupported Julia-specific lines are commented with TODO.
 function [y_nn, y_TL, y, y_hat, err, features] = comp_m2bc_test(comp_params, lines, df_line, df_flight, df_map, varargin)
-                        df_line::DataFrame, df_flight::DataFrame, df_map::DataFrame;
-                        silent::Bool = false)
+    y_nn = [];
+% TODO(Julia->MATLAB): df_line::DataFrame, df_flight::DataFrame, df_map::DataFrame;
+% TODO(Julia->MATLAB): silent::Bool = false)
 
-    seed!(2) % for reproducibility
+% TODO(Julia->MATLAB): seed!(2) % for reproducibility
     t0 = time()
 
     % unpack parameters
@@ -33,10 +34,10 @@ function [y_nn, y_TL, y, y_hat, err, features] = comp_m2bc_test(comp_params, lin
                                         silent           = silent_debug)
 
     % convert to Float32 for consistency with nn_comp_2_train
-    A       = Float32.(A)
-    x       = Float32.(x)
-    y       = Float32.(y)
-    TL_coef = Float32.(TL_coef)
+    A       = Float32(A)
+    x       = Float32(x)
+    y       = Float32(y)
+    TL_coef = Float32(TL_coef)
 
     % unpack data normalizations
     (A_bias,A_scale,v_scale,x_bias,x_scale,y_bias,y_scale) =
@@ -46,9 +47,9 @@ function [y_nn, y_TL, y, y_hat, err, features] = comp_m2bc_test(comp_params, lin
 
     TL_coef_norm = TL_coef ./ y_scale
 
-    % set to test mode in case model uses batchnorm or dropout
+% TODO(Julia->MATLAB): % set to test mode in case model uses batchnorm or dropout
     m = model
-    Flux.testmode!(m)
+% TODO(Julia->MATLAB): Flux.testmode!(m)
 
     y_nn  = vec(m(x_norm))       .* y_scale
     y_TL  = A_norm'*TL_coef_norm .* y_scale
@@ -59,10 +60,11 @@ function [y_nn, y_TL, y, y_hat, err, features] = comp_m2bc_test(comp_params, lin
                                  l_segs       = l_segs,
                                  silent       = true)
 
-    silent || @info("std    y_nn: $(round(std(y_nn),digits=2)) nT")
-    silent || @info("std    y_TL: $(round(std(y_TL),digits=2)) nT")
-    silent || @info("test  error: $(round(std(err ),digits=2)) nT")
+% TODO(Julia->MATLAB): silent || @info("std    y_nn: $(round(std(y_nn),digits=2)) nT")
+% TODO(Julia->MATLAB): silent || @info("std    y_TL: $(round(std(y_TL),digits=2)) nT")
+% TODO(Julia->MATLAB): silent || @info("test  error: $(round(std(err ),digits=2)) nT")
     silent || print_time(time()-t0,1)
 
+% return (y_nn, y_TL, y, y_hat, err, features)
 end % function comp_m2bc_test
 end

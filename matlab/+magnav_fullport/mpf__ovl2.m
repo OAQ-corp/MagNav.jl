@@ -1,7 +1,8 @@
 % Auto-generated from src/mpf.jl
 % Original Julia signature: function mpf(ins::INS, meas, itp_mapS; P0         = create_P0(),
-% Mechanical conversion draft: review before production use.
+% Executable draft: unsupported Julia-specific lines are commented with TODO.
 function out = mpf__ovl2(ins, meas, itp_mapS, varargin)
+    out = [];
              P0         = create_P0(),
              Qd         = create_Qd(),
              R          = 1.0,
@@ -12,7 +13,7 @@ function out = mpf__ovl2(ins, meas, itp_mapS, varargin)
              gyro_tau   = 3600.0,
              fogm_tau   = 600.0,
              date       = get_years(2020,185),
-             core::Bool = false)
+% TODO(Julia->MATLAB): core::Bool = false)
     mpf(ins.lat,ins.lon,ins.alt,ins.vn,ins.ve,ins.vd,ins.fn,ins.fe,ins.fd,
         ins.Cnb,meas,ins.dt,itp_mapS;
         P0       = P0,

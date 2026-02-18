@@ -1,9 +1,10 @@
 % Auto-generated from src/analysis_util.jl
 % Original Julia signature: function bpf_data(x::AbstractMatrix; bpf=get_bpf())
-% Mechanical conversion draft: review before production use.
+% Executable draft: unsupported Julia-specific lines are commented with TODO.
 function out = bpf_data(x, varargin)
-    x_f = float.(x)
-    for i in axes(x,2)
-        (std(x[:,i]) <= eps(eltype(x))) || (x_f[:,i] = filtfilt(bpf,x[:,i]))
+    out = [];
+    x_f = float(x)
+% TODO(Julia->MATLAB): for i in axes(x,2)
+        (std(x(:,i)) <= eps(eltype(x))) || (x_f(:,i) = filtfilt(bpf,x(:,i)))
     end
 end
