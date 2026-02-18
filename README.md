@@ -43,6 +43,10 @@ For general usage, run:
 julia> using MagNav
 ```
 
+### MATLAB migration support
+
+An incremental MATLAB port has started in the [`matlab`](matlab) folder. It currently includes curated MATLAB DCM/Euler utilities (`+magnav`) plus a full-code mechanical draft export (`+magnav_fullport`) generated from `src/*.jl` for staged migration.
+
 ### Examples
 
 Multiple example Jupyter and Pluto notebooks are in the [`examples`](examples) folder. Jupyter can be run directly in [Visual Studio Code](https://code.visualstudio.com/) (with the Jupyter extension). To start Pluto in a web browser, run:
