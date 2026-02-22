@@ -43,6 +43,23 @@ For general usage, run:
 julia> using MagNav
 ```
 
+### MATLAB migration support
+
+An incremental MATLAB port has started in the [`matlab`](matlab) folder. It includes curated MATLAB DCM/Euler utilities (`+magnav`) plus an auto-generated full-code draft export (`+magnav_fullport`) from `src/*.jl`, along with debug/check instructions for staged hardening.
+
+### Main navigation entrypoint (Julia)
+
+There is no single `main()` function in MagNav.jl. The primary navigation pipeline entrypoint is `run_filt(...)` (EKF/MPF/NEKF variants), typically with: trajectory (`Traj`), INS (`INS`), magnetic measurements, and a map interpolation function from `map_interpolate(...)`.
+
+A runnable minimal end-to-end script is provided at [`examples/navigation_entrypoint.jl`](examples/navigation_entrypoint.jl):
+
+```bash
+julia --project=. examples/navigation_entrypoint.jl
+```
+
+This script loads repository test data and runs `run_filt(..., :ekf)` so you can verify the navigation flow quickly.
+
+
 ### Examples
 
 Multiple example Jupyter and Pluto notebooks are in the [`examples`](examples) folder. Jupyter can be run directly in [Visual Studio Code](https://code.visualstudio.com/) (with the Jupyter extension). To start Pluto in a web browser, run:
