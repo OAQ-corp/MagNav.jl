@@ -28,7 +28,7 @@ Run navigation filter and optionally compute Cramér–Rao lower bound (CRLB).
 - `ins`:       `INS` inertial navigation system struct
 - `meas`:      scalar magnetometer measurement [nT]
 - `itp_mapS`:  scalar map interpolation function (`f(lat,lon)` or `f(lat,lon,alt)`)
-- `filt_type`: (optional) filter type {`:ekf`,`:fgo`,`:mpf`,`:nekf`,`:ekf_online`,`:ekf_online_nn`}
+- `filt_type`: (optional) filter type {`:ekf`,`:fgo`,`:fgo_online`,`:mpf`,`:nekf`,`:ekf_online`,`:ekf_online_nn`}
 - `P0`:        (optional) initial covariance matrix
 - `Qd`:        (optional) discrete time process/system noise matrix
 - `R`:         (optional) measurement (white) noise variance
@@ -41,7 +41,9 @@ Run navigation filter and optionally compute Cramér–Rao lower bound (CRLB).
 - `date`:      (optional) measurement date (decimal year) for IGRF [yr]
 - `core`:      (optional) if true, include core magnetic field in measurement
 - `map_alt`:   (optional) map altitude [m]
-- `n_iter`:    (optional) number of Gauss–Newton iterations, only used for `filt_type = :fgo`
+- `n_iter`:    (optional) number of Gauss–Newton iterations, only used for `filt_type = :fgo` or `:fgo_online`
+- `solver`:    (optional) factor graph solver {`:rts`,`:gn`}, only used for `filt_type = :fgo`
+- `robust`:    (optional) robust measurement kernel {`:none`,`:huber`,`:cauchy`}, only used for `filt_type = :fgo` or `:fgo_online`
 - `x_nn`:      (optional) `N` x `Nf` data matrix for neural network (`Nf` is number of features)
 - `m`:         (optional) neural network model
 - `y_norms`:   (optional) tuple of `y` normalizations, i.e., `(y_bias,y_scale)`
@@ -78,6 +80,8 @@ function run_filt(traj::Traj, ins::INS, meas, itp_mapS, filt_type::Symbol = :ekf
                   core::Bool     = false,
                   map_alt        = 0,
                   n_iter         = 5,
+                  solver::Symbol = :rts,
+                  robust::Symbol = :none,
                   x_nn           = nothing,
                   m              = nothing,
                   y_norms        = nothing,
@@ -111,7 +115,20 @@ function run_filt(traj::Traj, ins::INS, meas, itp_mapS, filt_type::Symbol = :ekf
                        date     = date,
                        core     = core,
                        map_alt  = map_alt,
+                       solver   = solver,
+                       robust   = robust,
                        n_iter   = n_iter);
+    elseif filt_type == :fgo_online
+        filt_res = fgo_online(ins,meas,flux,itp_mapS,x0_TL,P0,Qd,R;
+                              baro_tau = baro_tau,
+                              acc_tau  = acc_tau,
+                              gyro_tau = gyro_tau,
+                              fogm_tau = fogm_tau,
+                              date     = date,
+                              core     = core,
+                              terms    = terms,
+                              robust   = robust,
+                              n_iter   = n_iter);
     elseif filt_type == :ekf_online
         filt_res = ekf_online(ins,meas,flux,itp_mapS,x0_TL,P0,Qd,R;
                               baro_tau = baro_tau,

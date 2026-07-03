@@ -49,6 +49,17 @@ future), which generally reduces navigation error.
 MagNav.fgo
 ```
 
+### FGO with batch Tolles-Lawson estimation
+
+Aeromagnetic compensation (Tolles-Lawson) coefficients can be added to the
+factor graph as variables, so the platform field calibration is estimated
+jointly with the navigation states over the whole flight (the batch analog of
+[`MagNav.ekf_online`](@ref)).
+
+```@docs
+MagNav.fgo_online
+```
+
 ## Run Filter (with additional options)
 
 ```@docs

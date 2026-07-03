@@ -1,5 +1,6 @@
 using MagNav, Test, MAT
 using LinearAlgebra
+using Statistics: mean
 using MagNav: FILTres
 
 test_file = joinpath(@__DIR__,"test_data","test_data_ekf.mat")
@@ -139,4 +140,74 @@ end
     @test fgo(ins,mag_1_c,itp_mapS;n_iter=1)                   isa FILTres
     @test fgo(ins,mag_1_c,itp_mapS;n_iter=8,silent=false)      isa FILTres
     @test run_filt(traj,ins,mag_1_c,itp_mapS,:fgo;run_crlb=false) isa MagNav.FILTout
+end
+
+# sparse Gauss-Newton/QR (square-root information form) solver
+gn_res = fgo(ins_lat,ins_lon,ins_alt,ins_vn,ins_ve,ins_vd,
+             ins_fn,ins_fe,ins_fd,ins_Cnb,mag_1_c,dt,itp_mapS;
+             P0       = P0,
+             Qd       = Qd,
+             R        = R,
+             baro_tau = baro_tau,
+             acc_tau  = acc_tau,
+             gyro_tau = gyro_tau,
+             fogm_tau = fogm_tau,
+             core     = false,
+             solver   = :gn)
+
+@testset "fgo gn solver" begin
+    @test gn_res isa FILTres
+    @test all(isfinite, gn_res.x)
+    # both solvers compute the same MAP estimate: horizontal position states
+    # should agree closely (q_floor & conditioning allow small differences)
+    n_err_rts = dlat2dn.(fgo_res.x[1,:],lat)
+    n_err_gn  = dlat2dn.( gn_res.x[1,:],lat)
+    e_err_rts = dlon2de.(fgo_res.x[2,:],lat)
+    e_err_gn  = dlon2de.( gn_res.x[2,:],lat)
+    @test sqrt(mean(abs2, n_err_gn .- n_err_rts)) < 1.0 # [m]
+    @test sqrt(mean(abs2, e_err_gn .- e_err_rts)) < 1.0 # [m]
+    # navigation accuracy comparable to RTS solution
+    @test drms(gn_res) <= 1.20 * drms(fgo_res)
+end
+
+@testset "fgo robust kernels" begin
+    @test fgo(ins,mag_1_c,itp_mapS;robust=:huber)             isa FILTres
+    @test fgo(ins,mag_1_c,itp_mapS;robust=:cauchy)            isa FILTres
+    @test fgo(ins,mag_1_c,itp_mapS;solver=:gn,robust=:huber)  isa FILTres
+    @test MagNav.robust_weight(0.5,:huber ,1.345) ≈ 1.0
+    @test MagNav.robust_weight(2.69,:huber,1.345) ≈ 0.5
+    @test MagNav.robust_weight(2.385,:cauchy,2.385) ≈ 0.5
+    @test MagNav.robust_weight(9.9,:none ,1.345) ≈ 1.0
+    # a corrupted (outlier) segment should hurt the robust solution less
+    mag_bad = copy(mag_1_c)
+    mag_bad[41:50] .+= 500 # [nT] outlier segment
+    res_l2 = fgo(ins,mag_bad,itp_mapS;
+                 P0=P0,Qd=Qd,R=R,baro_tau=baro_tau,acc_tau=acc_tau,
+                 gyro_tau=gyro_tau,fogm_tau=fogm_tau)
+    res_hu = fgo(ins,mag_bad,itp_mapS;
+                 P0=P0,Qd=Qd,R=R,baro_tau=baro_tau,acc_tau=acc_tau,
+                 gyro_tau=gyro_tau,fogm_tau=fogm_tau,robust=:huber,n_iter=8)
+    @test drms(res_hu) <= drms(res_l2)
+end
+
+# batch Tolles-Lawson estimation (compensation factors)
+xyz0   = get_XYZ0(joinpath(@__DIR__,"test_data","test_data_traj.mat"),
+                  :traj,:none;silent=true)
+flux_a = xyz0.flux_a
+(x0_TL,P0_TL,TL_sigma) = ekf_online_setup(flux_a,xyz0.mag_1_c;N_sigma=10)
+(P0_o,Qd_o,R_o) = create_model(traj.dt,traj.lat[1];
+                               vec_states = false,
+                               TL_sigma   = TL_sigma,
+                               P0_TL      = P0_TL)
+
+@testset "fgo_online tests" begin
+    res_o = fgo_online(ins,xyz0.mag_1_c,flux_a,itp_mapS,x0_TL,P0_o,Qd_o,R_o)
+    @test res_o isa FILTres
+    @test size(res_o.x,1) == 18 + length(x0_TL)
+    @test all(isfinite, res_o.x)
+    @test fgo_online(ins,xyz0.mag_1_c,flux_a,map_cache,x0_TL,P0_o,Qd_o,R_o;
+                     robust=:huber) isa FILTres
+    @test run_filt(traj,ins,xyz0.mag_1_c,itp_mapS,:fgo_online;
+                   P0=P0_o,Qd=Qd_o,R=R_o,flux=flux_a,x0_TL=x0_TL,
+                   run_crlb=false) isa MagNav.FILTout
 end

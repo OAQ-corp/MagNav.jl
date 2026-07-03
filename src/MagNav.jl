@@ -29,6 +29,7 @@ module MagNav
     using Random: rand, randn, randperm, seed!, shuffle
     using SatelliteToolboxGeomagneticField: igrf, igrfd
     using ShapML: shap
+    using SparseArrays: sparse
     using SpecialFunctions: gamma, gamma_inc, gamma_inc_inv
     using Statistics: cor, cov, mean, median, std, var
     using StatsBase: autocor, skewness
@@ -1339,6 +1340,7 @@ module MagNav
     include("dcm.jl")
     include("ekf_&_crlb.jl")
     include("fgo.jl")
+    include("fgo_online.jl")
     include("ekf_online_nn.jl")
     include("ekf_online.jl")
     include("eval_filt.jl")
@@ -1382,7 +1384,7 @@ module MagNav
     create_XYZ0,create_traj,create_ins,create_flux,create_informed_xyz,
     euler2dcm,dcm2euler,
     ekf,crlb,
-    fgo,
+    fgo,fgo_online,
     ekf_online_nn,ekf_online_nn_setup,
     ekf_online,ekf_online_setup,
     eval_filt,run_filt,
