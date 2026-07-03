@@ -89,13 +89,19 @@ results = DataFrame(method=String[],segment=String[],drms=Float64[],time=Float64
 
 function run_and_log!(results, method, segment, traj, ins, meas, itp, filt_type;
                       kwargs...)
-    t = @elapsed filt_out = run_filt(traj,ins,meas,itp,filt_type;
-                                     kwargs...,core=true,run_crlb=false)
-    d = drms_out(filt_out,traj)
-    push!(results,(method,segment,d,t))
-    println(rpad(method,22)," DRMS = ",rpad(round(d,digits=1),8),
-            " m,  time = ",round(t,digits=1)," s")
-    return filt_out
+    try
+        t = @elapsed filt_out = run_filt(traj,ins,meas,itp,filt_type;
+                                         kwargs...,core=true,run_crlb=false)
+        d = drms_out(filt_out,traj)
+        push!(results,(method,segment,d,t))
+        println(rpad(method,22)," DRMS = ",rpad(round(d,digits=1),8),
+                " m,  time = ",round(t,digits=1)," s")
+        return filt_out
+    catch e
+        @warn("$method failed",e)
+        push!(results,(method,segment,NaN,NaN))
+        return nothing
+    end
 end
 
 ##* full line: EKF vs FGO (RTS) vs FGO (RTS,huber)
@@ -147,13 +153,22 @@ TL_ind  = get_ind(xyz_cal;tt_lim=[df_cal.t_start[TL_i],df_cal.t_end[TL_i]])
                                TL_sigma       = TL_sigma,
                                P0_TL          = P0_TL);
 
+#* larger position excursions (from the noisier cabin magnetometer) can
+#* slightly exceed the map borders near the north end of the line, so the
+#* interpolation is clamped to the map borders (edge value used outside)
+(lat_lo,lat_hi) = extrema(mapS.yy)
+(lon_lo,lon_hi) = extrema(mapS.xx)
+pad = 1e-7 # [rad] stay strictly inside the borders for cubic interpolation
+itp_clamp = (lat,lon,alt) -> itp_mapS(clamp(lat,lat_lo+pad,lat_hi-pad),
+                                      clamp(lon,lon_lo+pad,lon_hi-pad),alt)
+
 flux_use = xyz.flux_d(ind)
 mag_uc   = xyz.mag_4_uc[ind]
-run_and_log!(results,"EKF online","full",traj,ins,mag_uc,itp_mapS,:ekf_online;
+run_and_log!(results,"EKF online","full",traj,ins,mag_uc,itp_clamp,:ekf_online;
              P0=P0_o,Qd=Qd_o,R=R_o,flux=flux_use,x0_TL=x0_TL)
-run_and_log!(results,"FGO online","full",traj,ins,mag_uc,itp_mapS,:fgo_online;
+run_and_log!(results,"FGO online","full",traj,ins,mag_uc,itp_clamp,:fgo_online;
              P0=P0_o,Qd=Qd_o,R=R_o,flux=flux_use,x0_TL=x0_TL)
-run_and_log!(results,"FGO online (huber)","full",traj,ins,mag_uc,itp_mapS,:fgo_online;
+run_and_log!(results,"FGO online (huber)","full",traj,ins,mag_uc,itp_clamp,:fgo_online;
              P0=P0_o,Qd=Qd_o,R=R_o,flux=flux_use,x0_TL=x0_TL,robust=:huber)
 
 ##* results summary
