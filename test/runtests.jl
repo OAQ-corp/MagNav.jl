@@ -9,6 +9,7 @@ using TestItemRunner
 @testitem "create_XYZ     " begin include("test_create_XYZ.jl") end
 @testitem "dcm            " begin include("test_dcm.jl") end
 @testitem "ekf_&_crlb     " begin include("test_ekf_&_crlb.jl") end
+@testitem "fgo            " begin include("test_fgo.jl") end
 @testitem "ekf_online_nn  " begin include("test_ekf_online_nn.jl") end
 @testitem "ekf_online     " begin include("test_ekf_online.jl") end
 @testitem "eval_filt      " begin include("test_eval_filt.jl") end

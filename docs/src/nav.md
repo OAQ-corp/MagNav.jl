@@ -34,6 +34,21 @@ MagNav.crlb
 MagNav.ekf
 ```
 
+## Factor Graph Optimization
+
+The factor graph optimization (FGO) formulation poses navigation as a batch
+maximum a posteriori (MAP) estimation problem over the full flight. The error
+states are the variables, and prior, process (motion), and magnetic measurement
+factors define the objective. Because the Pinson error model is a linear-Gaussian
+chain, the MAP estimate is obtained exactly with an iterated fixed-interval
+(Rauch–Tung–Striebel) smoother that reuses the same model as [`MagNav.ekf`](@ref).
+Unlike the causal EKF, every estimate is informed by all measurements (past and
+future), which generally reduces navigation error.
+
+```@docs
+MagNav.fgo
+```
+
 ## Run Filter (with additional options)
 
 ```@docs
