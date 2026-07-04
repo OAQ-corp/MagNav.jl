@@ -241,5 +241,14 @@ rms_r(fr) = sqrt(mean(abs2, fr.r))
     @test rms_r(fr_both) <= rms_r(fr_base) + 1e-6
     # heading coefficient states are estimated (non-trivial) & finite
     @test all(isfinite, fr_head.x[19:20,:])
-    @test fgo_sensor(ins,mag_head,itp_mapS;n_harm=1,cal_bias=true) isa FILTres
+    # full sensor-error model: heading + bias + drift, dead-zone weighting
+    fr_all = fgo_sensor(ins,mag_head,itp_mapS;P0=P0,Qd=Qd,R=R,
+                        baro_tau=baro_tau,acc_tau=acc_tau,gyro_tau=gyro_tau,
+                        fogm_tau=fogm_tau,n_harm=2,cal_bias=true,drift=true,
+                        dead_zone=true)
+    @test size(fr_all.x,1) == 18 + 4 + 3 + 1
+    @test all(isfinite, fr_all.x)
+    @test fgo_sensor(ins,mag_head,itp_mapS;n_harm=1,cal_bias=true)   isa FILTres
+    @test fgo_sensor(ins,mag_head,itp_mapS;n_harm=1,heading=:yaw)    isa FILTres
+    @test fgo_sensor(ins,mag_head,itp_mapS;drift=true,dead_zone=true) isa FILTres
 end

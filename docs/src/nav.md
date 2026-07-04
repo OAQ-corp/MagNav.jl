@@ -62,11 +62,14 @@ MagNav.fgo_online
 
 ### FGO with scalar magnetometer sensor-error factors
 
-Scalar magnetometer sensor errors — quantum/optically-pumped heading error and
-fluxgate hard-iron bias — can be added to the factor graph as variables and
-estimated jointly with navigation. A low-dimensional grid or point-mass
-estimator (which carries only position) cannot do this; the continuous factor
-graph recovers a sensor calibration as a by-product.
+Scalar magnetometer sensor errors — optically-pumped / quantum heading error
+(modeled physically as a Fourier series in the sensor–field angle `θ`: vector
+light shift `∝ cos θ` and nonlinear Zeeman `∝ cos 2θ`), sensor dead zones
+(`∝ 1/|sin 2θ|` noise inflation), fluxgate hard-iron bias, and electronics
+drift — can be added to the factor graph as variables and estimated jointly with
+navigation. A low-dimensional grid or point-mass estimator (which carries only
+position) cannot do this; the continuous factor graph recovers a sensor
+calibration as a by-product.
 
 ```@docs
 MagNav.fgo_sensor
