@@ -39,16 +39,16 @@ jobs:
           version: '1'
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
+      - name: Render FGO geographic tracks & position-error plots
+        run: julia --project=. research/fgo_tracks.jl
+        env:
+          GKSwstype: '100'
       - name: Run FGO benchmark (real SGL Flt1003 data)
         run: julia --project=. research/fgo_benchmark.jl
         env:
           GKSwstype: '100'
       - name: Run FGO sensor-error factor ablation (simulated flight)
         run: julia --project=. research/fgo_sensor_ablation.jl
-        env:
-          GKSwstype: '100'
-      - name: Render FGO geographic tracks & position-error plots
-        run: julia --project=. research/fgo_tracks.jl
         env:
           GKSwstype: '100'
       - uses: actions/upload-artifact@v4

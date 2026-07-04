@@ -99,3 +99,33 @@ println("wrote fgo_map_track.png, fgo_pos_error.png, fgo_zoom_track.png")
 println("DRMS  INS=$(round(sqrt(mean(e_ins.^2)),digits=1))  ",
         "EKF=$(round(sqrt(mean(e_ekf.^2)),digits=1))  ",
         "FGO=$(round(sqrt(mean(e_fgo.^2)),digits=1)) m")
+
+##* also print downsampled tracks + map anomaly grid as CSV (for offline plots)
+step = max(1, div(length(tt),300))
+d = 1:step:length(tt)
+println("###TRACKCSV_START")
+println("tmin,tlat,tlon,ilat,ilon,elat,elon,flat,flon,eins,eekf,efgo")
+for i in d
+    println(join(round.([tt[i],
+        rad2deg(traj.lat[i]),rad2deg(traj.lon[i]),
+        rad2deg(ins.lat[i]),rad2deg(ins.lon[i]),
+        rad2deg(ekf_out.lat[i]),rad2deg(ekf_out.lon[i]),
+        rad2deg(fgo_out.lat[i]),rad2deg(fgo_out.lon[i]),
+        e_ins[i],e_ekf[i],e_fgo[i]],digits=7),","))
+end
+println("###TRACKCSV_END")
+
+# coarse map anomaly grid over the flight bbox for a background heatmap
+latlo,lathi = extrema(traj.lat); lonlo,lonhi = extrema(traj.lon)
+padlat = (lathi-latlo)*0.08; padlon = (lonhi-lonlo)*0.08
+glat = range(latlo-padlat,lathi+padlat,length=60)
+glon = range(lonlo-padlon,lonhi+padlon,length=60)
+println("###MAPCSV_START")
+println("nlat,nlon,latlo,lathi,lonlo,lonhi")
+println(join([60,60,rad2deg(first(glat)),rad2deg(last(glat)),
+              rad2deg(first(glon)),rad2deg(last(glon))],","))
+for la in glat
+    row = [ itp_mapS(la,lo,mapS.alt) for lo in glon ]
+    println(join(round.(row,digits=2),","))
+end
+println("###MAPCSV_END")
