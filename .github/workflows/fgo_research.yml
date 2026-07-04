@@ -43,9 +43,15 @@ jobs:
         run: julia --project=. research/fgo_benchmark.jl
         env:
           GKSwstype: '100'
+      - name: Run FGO sensor-error factor ablation (simulated flight)
+        run: julia --project=. research/fgo_sensor_ablation.jl
+        env:
+          GKSwstype: '100'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: fgo-benchmark-results
-          path: research/fgo_benchmark_results.csv
+          path: |
+            research/fgo_benchmark_results.csv
+            research/fgo_sensor_ablation_results.csv
           if-no-files-found: ignore

@@ -211,3 +211,35 @@ flux_a = xyz0.flux_a
                    P0=P0_o,Qd=Qd_o,R=R_o,flux=flux_a,x0_TL=x0_TL,
                    run_crlb=false) isa MagNav.FILTout
 end
+
+# sensor-error factors: inject a heading error into the scalar measurement
+(_,_,psi_t) = dcm2euler(Cnb,:body2nav)
+a1_true = 10.0
+b1_true = -6.0
+mag_head = mag_1_c .+ a1_true .* cos.(psi_t) .+ b1_true .* sin.(psi_t)
+
+rms_r(fr) = sqrt(mean(abs2, fr.r))
+
+@testset "fgo_sensor tests" begin
+    fr_base = fgo_sensor(ins,mag_head,itp_mapS;P0=P0,Qd=Qd,R=R,
+                         baro_tau=baro_tau,acc_tau=acc_tau,gyro_tau=gyro_tau,
+                         fogm_tau=fogm_tau)
+    fr_head = fgo_sensor(ins,mag_head,itp_mapS;P0=P0,Qd=Qd,R=R,
+                         baro_tau=baro_tau,acc_tau=acc_tau,gyro_tau=gyro_tau,
+                         fogm_tau=fogm_tau,n_harm=1)
+    fr_both = fgo_sensor(ins,mag_head,itp_mapS;P0=P0,Qd=Qd,R=R,
+                         baro_tau=baro_tau,acc_tau=acc_tau,gyro_tau=gyro_tau,
+                         fogm_tau=fogm_tau,n_harm=2,cal_bias=true,robust=:huber)
+    @test fr_base isa FILTres
+    @test size(fr_base.x,1) == 18                # no sensor states
+    @test size(fr_head.x,1) == 18 + 2            # 1 heading harmonic
+    @test size(fr_both.x,1) == 18 + 4 + 3        # 2 harmonics + 3 bias states
+    @test all(isfinite, fr_head.x)
+    @test all(isfinite, fr_both.x)
+    # extra measurement DOF cannot increase the post-fit residual
+    @test rms_r(fr_head) <= rms_r(fr_base) + 1e-6
+    @test rms_r(fr_both) <= rms_r(fr_base) + 1e-6
+    # heading coefficient states are estimated (non-trivial) & finite
+    @test all(isfinite, fr_head.x[19:20,:])
+    @test fgo_sensor(ins,mag_head,itp_mapS;n_harm=1,cal_bias=true) isa FILTres
+end

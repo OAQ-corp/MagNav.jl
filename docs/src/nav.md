@@ -60,6 +60,18 @@ jointly with the navigation states over the whole flight (the batch analog of
 MagNav.fgo_online
 ```
 
+### FGO with scalar magnetometer sensor-error factors
+
+Scalar magnetometer sensor errors — quantum/optically-pumped heading error and
+fluxgate hard-iron bias — can be added to the factor graph as variables and
+estimated jointly with navigation. A low-dimensional grid or point-mass
+estimator (which carries only position) cannot do this; the continuous factor
+graph recovers a sensor calibration as a by-product.
+
+```@docs
+MagNav.fgo_sensor
+```
+
 ## Run Filter (with additional options)
 
 ```@docs

@@ -1341,6 +1341,7 @@ module MagNav
     include("ekf_&_crlb.jl")
     include("fgo.jl")
     include("fgo_online.jl")
+    include("fgo_sensor.jl")
     include("ekf_online_nn.jl")
     include("ekf_online.jl")
     include("eval_filt.jl")
@@ -1384,7 +1385,7 @@ module MagNav
     create_XYZ0,create_traj,create_ins,create_flux,create_informed_xyz,
     euler2dcm,dcm2euler,
     ekf,crlb,
-    fgo,fgo_online,
+    fgo,fgo_online,fgo_sensor,
     ekf_online_nn,ekf_online_nn_setup,
     ekf_online,ekf_online_setup,
     eval_filt,run_filt,
