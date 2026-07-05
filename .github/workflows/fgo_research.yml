@@ -51,6 +51,10 @@ jobs:
         run: julia --project=. research/fgo_sensor_ablation.jl
         env:
           GKSwstype: '100'
+      - name: Compare vs online EKF+TL+NN family (paper baseline, Flt1007)
+        run: julia --project=. research/paper_baseline.jl
+        env:
+          GKSwstype: '100'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -61,4 +65,5 @@ jobs:
             research/fgo_map_track.png
             research/fgo_pos_error.png
             research/fgo_zoom_track.png
+            research/paper_baseline_results.csv
           if-no-files-found: ignore
