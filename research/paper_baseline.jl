@@ -103,14 +103,22 @@ for magsym in (:mag_4_uc, :mag_5_uc)
     mag_uc = getfield(xyz,magsym)[ind]
     tag    = replace(String(magsym),"mag_"=>"Mag ","_uc"=>"")
     println("=== $tag (uncompensated cabin magnetometer, cold start) ===")
-    try
+    try  # full-batch (static TL) — degrades over the long flight
         fo = run_filt(traj,ins,mag_uc,itp_mapS,:fgo_online;P0=P0,Qd=Qd,R=R,
                       flux=flux,x0_TL=x0_TL,core=true,run_crlb=false)
-        log!("FGO-online (TL, ours)",tag,fo)
-        fo = run_filt(traj,ins,mag_uc,itp_mapS,:fgo_online;P0=P0,Qd=Qd,R=R,
-                      flux=flux,x0_TL=x0_TL,robust=:huber,core=true,run_crlb=false)
-        log!("FGO-online +Huber (ours)",tag,fo)
-    catch e; @warn("fgo_online failed",e) end
+        log!("FGO-online batch (static TL)",tag,fo)
+    catch e; @warn("fgo_online batch failed",e) end
+    try  # fixed-lag sliding window — TL adapts over the flight (iSAM2-style)
+        frw = fgo_online(ins,mag_uc,flux,itp_mapS,x0_TL,P0,Qd,R;
+                         win=300.0,overlap=90.0,core=true)
+        log!("FGO-online win 5min (adaptive TL)",tag,MagNav.eval_filt(traj,ins,frw))
+        frw = fgo_online(ins,mag_uc,flux,itp_mapS,x0_TL,P0,Qd,R;
+                         win=120.0,overlap=45.0,core=true)
+        log!("FGO-online win 2min (adaptive TL)",tag,MagNav.eval_filt(traj,ins,frw))
+        frw = fgo_online(ins,mag_uc,flux,itp_mapS,x0_TL,P0,Qd,R;
+                         win=300.0,overlap=90.0,robust=:huber,core=true)
+        log!("FGO-online win 5min +Huber",tag,MagNav.eval_filt(traj,ins,frw))
+    catch e; @warn("fgo_online window failed",e) end
     println()
 end
 

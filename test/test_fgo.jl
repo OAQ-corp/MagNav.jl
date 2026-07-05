@@ -207,6 +207,12 @@ flux_a = xyz0.flux_a
     @test all(isfinite, res_o.x)
     @test fgo_online(ins,xyz0.mag_1_c,flux_a,map_cache,x0_TL,P0_o,Qd_o,R_o;
                      robust=:huber) isa FILTres
+    # fixed-lag sliding-window smoother (adaptive TL)
+    res_w = fgo_online(ins,xyz0.mag_1_c,flux_a,itp_mapS,x0_TL,P0_o,Qd_o,R_o;
+                       win=3.0,overlap=1.0)
+    @test res_w isa FILTres
+    @test size(res_w.x) == size(res_o.x)
+    @test all(isfinite, res_w.x)
     @test run_filt(traj,ins,xyz0.mag_1_c,itp_mapS,:fgo_online;
                    P0=P0_o,Qd=Qd_o,R=R_o,flux=flux_a,x0_TL=x0_TL,
                    run_crlb=false) isa MagNav.FILTout

@@ -67,6 +67,8 @@ measurement kernels are applied with iteratively reweighted least squares.
 - `Bt_scale`:     (optional) scaling factor for induced & eddy current terms [nT]
 - `robust`:       (optional) robust measurement kernel {`:none`,`:huber`,`:cauchy`}
 - `robust_c`:     (optional) robust kernel tuning constant, `0` for default (`1.345` Huber, `2.385` Cauchy)
+- `win`:          (optional) fixed-lag window length [s], `0` for a single full-batch fit
+- `overlap`:      (optional) window overlap [s] used as warm-up and discarded
 - `n_iter`:       (optional) maximum number of Gauss–Newton (relinearization/IRLS) iterations
 - `tol`:          (optional) convergence tolerance on the RMS smoothed state change between iterations
 - `silent`:       (optional) if true, no print outs
@@ -86,11 +88,26 @@ function fgo_online(lat, lon, alt, vn, ve, vd, fn, fe, fd, Cnb, meas,
                     Bt_scale       = 50000,
                     robust::Symbol = :none,
                     robust_c       = 0,
+                    win            = 0.0,
+                    overlap        = 0.0,
                     n_iter         = 5,
                     tol            = 1e-4,
                     silent         = true)
 
     @assert robust in (:none,:huber,:cauchy) "robust kernel $robust not defined"
+
+    # fixed-lag / sliding-window smoother (incremental FGO, iSAM2-style): let the
+    # Tolles-Lawson calibration adapt over a long flight instead of one static
+    # batch fit. Each window is a batch FGO whose TL estimate is carried forward.
+    if win > 0
+        return fgo_online_window(lat,lon,alt,vn,ve,vd,fn,fe,fd,Cnb,meas,Bx,By,Bz,
+                                 dt,itp_mapS,x0_TL,P0,Qd,R;
+                                 win=win,overlap=overlap,baro_tau=baro_tau,
+                                 acc_tau=acc_tau,gyro_tau=gyro_tau,fogm_tau=fogm_tau,
+                                 date=date,core=core,terms=terms,Bt_scale=Bt_scale,
+                                 robust=robust,robust_c=robust_c,n_iter=n_iter,
+                                 tol=tol,silent=silent)
+    end
 
     N      = length(lat)
     ny     = size(meas,2)
@@ -181,6 +198,68 @@ function fgo_online(lat, lon, alt, vn, ve, vd, fn, fe, fd, Cnb, meas,
 end # function fgo_online
 
 """
+    fgo_online_window(lat, ..., R; win, overlap, kwargs...)
+
+Internal helper: fixed-lag / sliding-window `fgo_online`. The flight is processed
+in overlapping windows of length `win` [s] (overlap `overlap` [s]); each window is
+a batch FGO whose Tolles-Lawson estimate (and its covariance) is carried forward
+as the prior for the next window, so the calibration adapts to time-varying
+platform interference (the FGO analog of an online/adaptive filter, à la iSAM2).
+The navigation error is re-anchored to the INS+map each window; the overlap
+region is used as warm-up and discarded (except the first window).
+
+**Returns:**
+- `filt_res`: `FILTres` stitched filter (smoother) results struct
+"""
+function fgo_online_window(lat, lon, alt, vn, ve, vd, fn, fe, fd, Cnb, meas,
+                           Bx, By, Bz, dt, itp_mapS, x0_TL, P0, Qd, R;
+                           win, overlap, kwargs...)
+    N     = length(lat)
+    ny    = size(meas,2)
+    nx    = size(P0,1)
+    nx_TL = length(x0_TL)
+    Lw    = max(2, round(Int, win/dt))
+    Lo    = clamp(round(Int, overlap/dt), 0, Lw-1)
+    stride = max(1, Lw - Lo)
+
+    x_out = zeros(eltype(P0),nx,N)
+    P_out = zeros(eltype(P0),nx,nx,N)
+    r_out = zeros(eltype(P0),ny,N)
+
+    x0_TL_c = collect(eltype(P0),x0_TL)
+    P0_c    = copy(P0)
+    i0      = 1
+    first   = true
+
+    while i0 <= N
+        i1 = min(i0+Lw-1, N)
+        S  = i0:i1
+        res = fgo_online(lat[S],lon[S],alt[S],vn[S],ve[S],vd[S],fn[S],fe[S],fd[S],
+                         Cnb[:,:,S],meas[S,:],Bx[S],By[S],Bz[S],dt,itp_mapS,
+                         x0_TL_c,P0_c,Qd,R; win=0.0,overlap=0.0, kwargs...)
+
+        gc0 = first ? i0 : i0+Lo             # committed global start
+        gc1 = (i1==N) ? i1 : i0+stride-1     # committed global end
+        lc0 = gc0-i0+1                       # local indices within window
+        lc1 = gc1-i0+1
+        x_out[:,gc0:gc1]   = res.x[:,lc0:lc1]
+        P_out[:,:,gc0:gc1] = res.P[:,:,lc0:lc1]
+        r_out[:,gc0:gc1]   = res.r[:,lc0:lc1]
+
+        # carry the learned TL (mean + covariance) into the next window's prior
+        x0_TL_c = res.x[18:17+nx_TL, lc1]
+        P0_c    = copy(P0)
+        P0_c[18:17+nx_TL,18:17+nx_TL] = res.P[18:17+nx_TL,18:17+nx_TL,lc1]
+
+        i1 == N && break
+        i0   += stride
+        first = false
+    end
+
+    return FILTres(x_out, P_out, r_out, true)
+end # function fgo_online_window
+
+"""
     fgo_online(ins::INS, meas, flux::MagV, itp_mapS, x0_TL, P0, Qd, R;
                baro_tau       = 3600.0,
                acc_tau        = 3600.0,
@@ -236,6 +315,8 @@ function fgo_online(ins::INS, meas, flux::MagV, itp_mapS, x0_TL, P0, Qd, R;
                     Bt_scale       = 50000,
                     robust::Symbol = :none,
                     robust_c       = 0,
+                    win            = 0.0,
+                    overlap        = 0.0,
                     n_iter         = 5,
                     tol            = 1e-4,
                     silent         = true)
@@ -251,6 +332,8 @@ function fgo_online(ins::INS, meas, flux::MagV, itp_mapS, x0_TL, P0, Qd, R;
                Bt_scale = Bt_scale,
                robust   = robust,
                robust_c = robust_c,
+               win      = win,
+               overlap  = overlap,
                n_iter   = n_iter,
                tol      = tol,
                silent   = silent)
