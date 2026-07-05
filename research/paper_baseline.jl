@@ -52,6 +52,11 @@ line   = 1007.06                      # paper's primary line
 @info("loading $flight")
 xyz  = get_XYZ(flight,df_flight;silent=true)
 ind  = get_ind(xyz,line,df_nav)
+# restrict to the first 25 min of the line (10-min warm-up + 15-min evaluation);
+# keeps the sampling rate intact and bounds the augmented-EKF covariance memory
+# (the full 87-min line would make the NN filter's P_out ~6 GB → OOM on CI)
+t0   = xyz.traj.tt[ind][1]
+ind  = ind .& (xyz.traj.tt .<= t0 + 1500.0)
 map_name = df_nav[(df_nav.flight.==flight).&(df_nav.line.==line),:map_name][1]
 mapS = get_map(map_name,df_map)
 
