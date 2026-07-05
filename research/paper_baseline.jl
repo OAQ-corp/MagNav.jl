@@ -100,7 +100,7 @@ println("\nINS (no aiding) DRMS(>10min) = ",round(ins_drms,digits=1)," m\n")
 # stinger reference: EKF on the pre-compensated Mag 1 (best case; only mag_1_c
 # exists in the dataset — cabin mags 2-5 are uncompensated only)
 try
-    (_,_,fo) = run_filt(traj,ins,xyz.mag_1_c[ind],itp_mapS,:ekf;P0=P0n,Qd=Qdn,R=Rn,
+    fo = run_filt(traj,ins,xyz.mag_1_c[ind],itp_mapS,:ekf;P0=P0n,Qd=Qdn,R=Rn,
                         core=true,run_crlb=false); log!("EKF (Mag1 compensated)","Mag 1",fo)
 catch e; @warn("EKF Mag1 failed",e) end
 println()
@@ -112,7 +112,7 @@ for magsym in (:mag_4_uc, :mag_5_uc)
 
     # TL-only online calibration, cold start  (paper Fig. 8b family)
     try
-        (_,_,fo) = run_filt(traj,ins,mag_uc,itp_mapS,:ekf_online;P0=P0,Qd=Qd,R=R,
+        fo = run_filt(traj,ins,mag_uc,itp_mapS,:ekf_online;P0=P0,Qd=Qd,R=R,
                             flux=flux,x0_TL=x0_TL,core=true,run_crlb=false)
         log!("EKF-online (TL)",tag,fo)
     catch e; @warn("ekf_online failed",e) end
@@ -124,7 +124,7 @@ for magsym in (:mag_4_uc, :mag_5_uc)
         (_,_,x_norm) = norm_sets(x)
         (yb,ys,_)    = norm_sets(mag_uc)
         Nf   = size(x_norm,2)
-        m    = get_nn_m(Nf;hidden=[5])           # small NN, NOT pre-trained (cold start)
+        m    = MagNav.get_nn_m(Nf;hidden=[5])           # small NN, NOT pre-trained (cold start)
         n_w  = length(Flux.destructure(m)[1])
         P0_nn    = Matrix(Diagonal(fill(1.0,n_w)))
         nn_sigma = fill(0.05,n_w)
@@ -132,17 +132,17 @@ for magsym in (:mag_4_uc, :mag_5_uc)
                                     init_pos_sigma=0.1,init_alt_sigma=1.0,init_vel_sigma=1.0,
                                     meas_var=5^2,fogm_sigma=3,fogm_tau=180,
                                     vec_states=false,TL_sigma=nn_sigma,P0_TL=P0_nn)
-        (_,_,fo) = run_filt(traj,ins,mag_uc,itp_mapS,:ekf_online_nn;P0=P0N,Qd=QdN,R=RN,
+        fo = run_filt(traj,ins,mag_uc,itp_mapS,:ekf_online_nn;P0=P0N,Qd=QdN,R=RN,
                             x_nn=x_norm,m=m,y_norms=(yb,ys),core=true,run_crlb=false)
         log!("EKF-online-NN (cold)",tag,fo)
     catch e; @warn("ekf_online_nn failed",e) end
 
     # OUR batch FGO with TL factor nodes, cold start
     try
-        (_,_,fo) = run_filt(traj,ins,mag_uc,itp_mapS,:fgo_online;P0=P0,Qd=Qd,R=R,
+        fo = run_filt(traj,ins,mag_uc,itp_mapS,:fgo_online;P0=P0,Qd=Qd,R=R,
                             flux=flux,x0_TL=x0_TL,core=true,run_crlb=false)
         log!("FGO-online (TL, ours)",tag,fo)
-        (_,_,fo) = run_filt(traj,ins,mag_uc,itp_mapS,:fgo_online;P0=P0,Qd=Qd,R=R,
+        fo = run_filt(traj,ins,mag_uc,itp_mapS,:fgo_online;P0=P0,Qd=Qd,R=R,
                             flux=flux,x0_TL=x0_TL,robust=:huber,core=true,run_crlb=false)
         log!("FGO-online +Huber (ours)",tag,fo)
     catch e; @warn("fgo_online failed",e) end
