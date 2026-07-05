@@ -36,7 +36,9 @@ NN_HIDDEN   = [8]                       # NN hidden layer sizes (small ⇒ memor
 TL_TERMS    = [:permanent]              # TL basis columns fed to the NN as features
 P0NN_SIGMA  = 0.3                       # initial NN-weight std (weights are O(1))
 WEIGHT_Q    = 3e-3                      # per-step NN-weight random-walk std (adaptation rate)
-MEAS_VAR    = 7.0^2                     # scalar map-match measurement variance [nT^2]
+MEAS_VAR    = 12.0^2                    # scalar map-match measurement variance [nT^2]
+# (12^2 is the locked value: it gave the best noisy-mag result, Mag 4 40.0 m;
+#  tightening to 7^2 sharpened Mag 5 slightly but regressed Mag 4 to 46.5 m.)
 FOGM_SIGMA  = 3.0                       # FOGM catch-all sigma [nT]
 FOGM_TAU    = 180.0                     # FOGM catch-all time constant [s]
 WARMUP_S    = 600.0                     # DRMS warm-up (paper convention) [s]

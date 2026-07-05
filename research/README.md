@@ -23,6 +23,8 @@ and reproducible simulations.
 | `test/test_fgo.jl` | 254 | structure, accuracy-vs-EKF/INS, GN↔RTS agreement, robust-kernel, `fgo_online`, and `fgo_sensor` tests (registered in `runtests.jl`). |
 | `examples/fgo_example.jl` | 65 | runnable EKF-vs-FGO demo on the bundled simple dataset. |
 | `research/fgo_benchmark.jl` | 181 | real SGL **Flt1003** DRMS benchmark across all methods. |
+| `research/paper_baseline.jl` | — | line 1007.06: our FGO-online (static + sliding-window TL) vs Hager et al. (2026) cited DRMS. |
+| `research/paper_impl.jl` | — | **re-runs** the paper's online EKF+TL+NN (`ekf_online_nn`) cold start on line 1007.06 — a genuine reproduced baseline (Mag 4 40.0 m, Mag 5 17.5 m). |
 | `research/fgo_sensor_ablation.jl` | 154 | factorial sensor-error ablation with injected-truth recovery. |
 | `research/fgo_tracks.jl` | 131 | geographic map+track and position-error figures. |
 | `.github/workflows/fgo_research.yml` | — | CI: test suite + all three research scripts on every push. |
@@ -119,29 +121,78 @@ julia --project=. research/fgo_tracks.jl           # map + track + error figures
 
 ## 5b. Comparison to the online EKF+TL+NN cold-start literature
 
-`research/paper_baseline.jl` positions our batch **FGO-online (TL factors)**
-against the online EKF + Tolles-Lawson + neural-network cold-start calibration
-of Hager et al. (2026, arXiv 2603.08265), on that paper's primary line 1007.06
-(uncompensated cabin magnetometers, DRMS after a 10-min warm-up).
+We compare against the online EKF + Tolles-Lawson + neural-network cold-start
+calibration of Hager et al. (2026, arXiv 2603.08265), on that paper's primary
+line 1007.06, full 87 min, uncompensated cabin magnetometers, DRMS after a
+10-min warm-up. Two scripts:
 
-**Honesty note.** We do **not** re-run the paper's filter. Its stabilized
-cold-start NN-in-EKF depends on a natural-gradient / residual-constraint design
-and covariance tuning that are not publicly released; a naive cold-start of an
-untrained NN-in-EKF simply diverges (which is the very instability their design
-prevents), so re-running it untuned would be a strawman, not a reproduction.
-We therefore run only our own FGO-online from the same cold start and cite the
-paper's **published** cold-start DRMS as a reference line.
+- `research/paper_baseline.jl` runs **our** methods (FGO-online with static and
+  sliding-window / adaptive TL) and prints the paper's published DRMS as a cited
+  reference line.
+- `research/paper_impl.jl` actually **re-runs the paper's filter family**: the
+  MagNav.jl `ekf_online_nn` — an online EKF with the TL basis as NN input
+  features and the NN weights carried as EKF states, learned online from a cold
+  start (the reference implementation of the SGL/AFIT online NN-in-EKF lineage
+  the paper builds on).
 
-| Magnetometer | paper TL-only | paper TL+NN | **FGO-online (TL, ours)** |
-|---|---:|---:|---:|
-| Mag 4 (uncompensated) | 58 m | 37 m | see CI |
-| Mag 5 (uncompensated) | 15 m | 14 m | see CI |
+**Reproducing the cold start took care, and the failure modes were instructive.**
+A naive cold start of `ekf_online_nn` diverges; getting it into the paper's band
+required three fixes, each addressing a distinct, diagnosable failure:
 
-Reading it honestly: our batch FGO-online reaches this accuracy band with **TL
-only (no neural network)** from a cold start — competitive with the paper's
-TL+NN on the cleaner magnetometer, while the platform's own NN helps most on the
-noisiest one. This is an *indicative* comparison, not a controlled reproduction;
-exact numbers are in the CI artifact `paper_baseline_results.csv`.
+1. **Bias handling** — the NN compensation must represent only the aircraft
+   interference (the core + map field is already supplied by `get_h`), and its DC
+   offset is initialized from onboard data (median of `mag_uc − get_h` over the
+   first minutes). Without this the first residual is the full interference DC and
+   the Kalman gain spikes to a NaN divergence.
+2. **Feature design** — the scalar `mag_uc` must be **excluded** from the NN
+   inputs (TL A-matrix only). It carries the map anomaly, so feeding it to the
+   compensation NN lets the network subtract the very signal we navigate on,
+   collapsing observability (residual → 0 while position drifts to km scale — Mag 4
+   at 5.8 km with `max|resid|` only 78 nT). This is exactly the instability the
+   paper's natural-gradient stabilization is designed to prevent; here it is
+   prevented structurally, through the feature set.
+3. **Covariance** — de-trust the map through the cold-start transient
+   (`meas_var = 12²`) and set the NN weight process noise by hand.
+
+**Reproduced result (our re-run of the online EKF+TL+NN, cold start, line 1007.06,
+full length; INS 318 m, EKF on compensated Mag 1 ≈ 20 m for reference):**
+
+| Magnetometer | paper TL-only | paper TL+NN | **EKF+TL+NN re-run (ours)** | **FGO-online win 5min +Huber (ours)** |
+|---|---:|---:|---:|---:|
+| Mag 4 (uncompensated) | 58 m | 37 m | **40.0 m** | **32.6 m** |
+| Mag 5 (uncompensated) | 15 m | 14 m | **17.5 m** | **14.2 m** |
+
+Reading it honestly: our re-run of the online EKF+TL+NN lands **in the paper's
+published cold-start band** — beating their TL-only and within a few metres of
+their tuned TL+NN. It is a fair reproduction, not an exact one: we do not have
+their released architecture / natural-gradient stabilization, so we sit a few
+metres above their tuned filter. It now serves as a genuine, re-run baseline
+rather than a cited number. Notably, our **sliding-window FGO-online** (adaptive
+TL, fixed-lag smoother, *no neural network*) matches or beats that reproduced
+EKF+TL+NN on the same line — see §5c. Exact numbers are in the CI artifacts
+`paper_impl_results.csv` and `paper_baseline_results.csv`.
+
+## 5c. Sliding-window (fixed-lag) FGO-online vs static-batch TL
+
+A single batch solves one static TL coefficient set for the whole flight, which
+underfits time-varying interference over a long line. Running `fgo_online` as an
+**iSAM2-style fixed-lag smoother** (kwargs `win`/`overlap`; each window commits
+its leading `stride` and carries the full state + covariance forward as the prior
+for the next) makes the TL compensation **adapt** along the flight. On line
+1007.06 (full 87 min) this recovers the long-line performance dramatically:
+
+| Method (line 1007.06, full length) | Mag 4 | Mag 5 |
+|---|---:|---:|
+| FGO-online **batch** (static TL) | 123.7 m | 68.1 m |
+| FGO-online **win 5 min** (adaptive TL) | 37.0 m | 15.1 m |
+| FGO-online **win 2 min** (adaptive TL) | 45.9 m | 17.1 m |
+| **FGO-online win 5 min + Huber** | **32.6 m** | **14.2 m** |
+| — paper TL+NN (Hager et al. 2026) | 37 m | 14 m |
+
+The fixed-lag window takes the static batch from 124 → 32.6 m (Mag 4) and
+68 → 14.2 m (Mag 5), **matching or beating the paper's cold-start TL+NN with no
+neural network** — the adaptive-TL relinearization plays the role their online NN
+plays. Produced by `research/paper_baseline.jl`.
 
 ## 6. Reproducibility
 

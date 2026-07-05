@@ -134,5 +134,6 @@ println("\n=== paper reported cold-start DRMS [m] (Hager et al. 2026, CITED — 
 show(paper;allrows=true,allcols=true); println()
 CSV.write(joinpath(@__DIR__,"paper_baseline_results.csv"),results)
 CSV.write(joinpath(@__DIR__,"paper_reference_values.csv"),paper)
-println("\nNOTE: indicative comparison only. Paper values are their PUBLISHED",
-        " cold-start results; we did not reproduce their tuned NN-in-EKF filter.")
+println("\nNOTE: paper values are their PUBLISHED cold-start results. Our online",
+        " EKF+TL+NN re-run of that filter family is in research/paper_impl.jl",
+        " (reproduced Mag 4 40.0 m, Mag 5 17.5 m — in the paper's band).")
