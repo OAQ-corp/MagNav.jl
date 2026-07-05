@@ -35,8 +35,8 @@ seed!(33)
 NN_HIDDEN   = [8]                       # NN hidden layer sizes (small ⇒ memory-safe)
 TL_TERMS    = [:permanent]              # TL basis columns fed to the NN as features
 P0NN_SIGMA  = 0.3                       # initial NN-weight std (weights are O(1))
-WEIGHT_Q    = 1e-3                      # per-step NN-weight random-walk std (adaptation rate)
-MEAS_VAR    = 5.0^2                     # scalar map-match measurement variance [nT^2]
+WEIGHT_Q    = 3e-3                      # per-step NN-weight random-walk std (adaptation rate)
+MEAS_VAR    = 12.0^2                    # scalar map-match measurement variance [nT^2]
 FOGM_SIGMA  = 3.0                       # FOGM catch-all sigma [nT]
 FOGM_TAU    = 180.0                     # FOGM catch-all time constant [s]
 WARMUP_S    = 600.0                     # DRMS warm-up (paper convention) [s]
@@ -142,6 +142,12 @@ for magsym in (:mag_4_uc, :mag_5_uc)
         frw = ekf_online_nn(ins,mag_uc,itp_mapS,x_norm,m,y_norms,P0,Qd,R;
                             fogm_tau=FOGM_TAU,core=true)
         fo  = MagNav.eval_filt(traj,ins,frw)
+        # diagnostic: DRMS over the last half of the flight — if the NN has
+        # learned the compensation, the late-window error is much smaller than
+        # the full-warmup error even when the cold-start transient was rough.
+        late = round(drms(fo;warm=N*traj.dt/2),digits=1)
+        rmax = round(maximum(abs,frw.r),digits=0)
+        println("  late-half DRMS = $late m,  max|resid| = $rmax nT")
         log!("EKF+TL+NN online (cold start)",tag,drms(fo))
     catch e; @warn("ekf_online_nn failed for $tag",e) end
     println()
