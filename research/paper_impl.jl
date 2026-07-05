@@ -44,12 +44,13 @@ WARMUP_S    = 600.0                     # DRMS warm-up (paper convention) [s]
 # NOTE on the measurement model (why divergence is avoided): the EKF residual is
 #   resid = meas − [ NN(x_nn)·y_scale + y_bias ] − get_h(map; core=true)
 # get_h already supplies the core (IGRF) + map anomaly (~50000 nT), so the NN
-# compensation must represent ONLY the aircraft interference (~10²–10³ nT). We
-# therefore run the NN bias-FREE (y_bias = 0): a randomly-initialized network
-# outputs ~0, so the initial residual is the bounded interference and the filter
-# learns the compensation online (true cold start). y_scale sets the NN output
-# range (≈ interference magnitude). We size the weight covariance by hand rather
-# than via ekf_online_nn_setup, whose RLS warm start mixes normalized/raw units.
+# compensation must represent ONLY the aircraft interference (~10²–10³ nT). The
+# NN bias y_bias is set to the interference DC estimated onboard over the first
+# few minutes (see the per-mag block): a randomly-initialized network then starts
+# near the right offset, so the first residual is small even for the noisy cabin
+# mags and position is not kicked before the NN learns (true cold start). y_scale
+# sets the NN output range (≈ interference std). We size the weight covariance by
+# hand rather than via ekf_online_nn_setup, whose RLS warm start mixes units.
 
 df_dir    = joinpath(@__DIR__,"..","examples","dataframes")
 df_flight = DataFrame(CSV.File(joinpath(df_dir,"df_flight.csv")))
@@ -123,10 +124,23 @@ for magsym in (:mag_4_uc, :mag_5_uc)
         Nf = size(x,2)
         (_,_,x_norm) = norm_sets(x)
         x_norm = Float32.(x_norm)            # match NN parameter eltype (avoid per-step convert)
-        # NN output range ≈ interference magnitude; bias-free (see NOTE above)
-        y_scale = std(mag_uc .- map_val)
-        y_norms = (0.0f0, Float32(y_scale))
-        println("  Nf=$Nf features, y_scale=",round(y_scale,digits=1)," nT")
+        # Cold-start DC initialization (fixes the large-interference divergence):
+        # a randomly-initialized NN outputs ~0, so with a bias-free compensation
+        # the first residual is the full interference DC — for the noisy cabin
+        # mags (~250 nT) that spikes the Kalman gain and runs position away before
+        # the NN can learn. We remove that DC at t=0 using ONLY onboard information
+        # (map anomaly + IGRF core, evaluated at the INS position over the first
+        # 5 min while the INS still ≈ truth — no truth leak); the NN then only has
+        # to learn the maneuver-dependent residual around it.
+        Mw   = min(N, round(Int, 300/traj.dt))
+        xz   = zeros(18, Mw)
+        pred = MagNav.get_h(itp_mapS, xz, ins.lat[1:Mw], ins.lon[1:Mw], ins.alt[1:Mw]; core=true)
+        intf = mag_uc[1:Mw] .- pred          # aircraft interference estimate [nT]
+        bias0   = median(intf)               # interference DC to remove at cold start
+        y_scale = std(intf)                  # NN output range ≈ interference std
+        y_norms = (Float32(bias0), Float32(y_scale))
+        println("  Nf=$Nf feat, interference DC=",round(bias0,digits=1),
+                " nT, y_scale=",round(y_scale,digits=1)," nT")
 
         m  = MagNav.get_nn_m(Nf,1;hidden=NN_HIDDEN)   # randomly-initialized NN (cold start)
         nx_nn    = length(MagNav.destructure(m)[1])
