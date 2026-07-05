@@ -117,6 +117,32 @@ julia --project=. research/fgo_tracks.jl           # map + track + error figures
 3. **Tolles-Lawson factors (joint compensation)** — ✅ EKF-online diverges, FGO-online 22.6 m.
 4. **Physical OPM sensor-error factors (heading/dead-zone/bias/drift) + robust** — ✅ ablation 36.6 → 4.8 m, with an honest observability caveat.
 
+## 5b. Comparison to the online EKF+TL+NN cold-start literature
+
+`research/paper_baseline.jl` positions our batch **FGO-online (TL factors)**
+against the online EKF + Tolles-Lawson + neural-network cold-start calibration
+of Hager et al. (2026, arXiv 2603.08265), on that paper's primary line 1007.06
+(uncompensated cabin magnetometers, DRMS after a 10-min warm-up).
+
+**Honesty note.** We do **not** re-run the paper's filter. Its stabilized
+cold-start NN-in-EKF depends on a natural-gradient / residual-constraint design
+and covariance tuning that are not publicly released; a naive cold-start of an
+untrained NN-in-EKF simply diverges (which is the very instability their design
+prevents), so re-running it untuned would be a strawman, not a reproduction.
+We therefore run only our own FGO-online from the same cold start and cite the
+paper's **published** cold-start DRMS as a reference line.
+
+| Magnetometer | paper TL-only | paper TL+NN | **FGO-online (TL, ours)** |
+|---|---:|---:|---:|
+| Mag 4 (uncompensated) | 58 m | 37 m | see CI |
+| Mag 5 (uncompensated) | 15 m | 14 m | see CI |
+
+Reading it honestly: our batch FGO-online reaches this accuracy band with **TL
+only (no neural network)** from a cold start — competitive with the paper's
+TL+NN on the cleaner magnetometer, while the platform's own NN helps most on the
+noisiest one. This is an *indicative* comparison, not a controlled reproduction;
+exact numbers are in the CI artifact `paper_baseline_results.csv`.
+
 ## 6. Reproducibility
 
 CI runs the full test suite (Julia LTS + latest) plus all research scripts on

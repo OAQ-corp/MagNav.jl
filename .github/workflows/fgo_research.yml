@@ -66,4 +66,5 @@ jobs:
             research/fgo_pos_error.png
             research/fgo_zoom_track.png
             research/paper_baseline_results.csv
+            research/paper_reference_values.csv
           if-no-files-found: ignore
