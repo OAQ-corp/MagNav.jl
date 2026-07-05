@@ -14,10 +14,11 @@
 # the network represents "TL + nonlinear residual" — i.e. EKF + TL + NN.
 #
 # Cold start = no calibration flight, no NN pre-training: the network is randomly
-# initialized and `ekf_online_nn_setup` (recursive-least-squares warm start) sizes
-# the weight process-noise (nn_sigma) and initial weight covariance (P0_nn) using
-# only onboard information (uncompensated mag minus the onboard map field). This
-# RLS warm start is our analog of the paper's stabilized cold-start design.
+# initialized and the compensation is learned online from the map-match residual.
+# The NN is run bias-FREE so it represents only the aircraft interference (the
+# core + map field is supplied by get_h); the weight covariances (initial P0_nn,
+# per-step process noise) are set by hand so the adaptation rate is an explicit,
+# tunable knob rather than an opaque warm-start artifact.
 #
 # Data: SGL 2020, line 1007.06, full length, uncompensated cabin magnetometers,
 # DRMS after a 10-min warm-up (paper convention).
@@ -33,13 +34,22 @@ seed!(33)
 ##* -------- tuning knobs (iterate these toward the paper band) --------------
 NN_HIDDEN   = [8]                       # NN hidden layer sizes (small ⇒ memory-safe)
 TL_TERMS    = [:permanent]              # TL basis columns fed to the NN as features
-SIGMA_SCALE = 1.0                       # multiplier on RLS-derived weight process noise
+P0NN_SIGMA  = 0.3                       # initial NN-weight std (weights are O(1))
+WEIGHT_Q    = 1e-3                      # per-step NN-weight random-walk std (adaptation rate)
 MEAS_VAR    = 5.0^2                     # scalar map-match measurement variance [nT^2]
 FOGM_SIGMA  = 3.0                       # FOGM catch-all sigma [nT]
 FOGM_TAU    = 180.0                     # FOGM catch-all time constant [s]
 WARMUP_S    = 600.0                     # DRMS warm-up (paper convention) [s]
-N_SIGMA     = 1000                      # RLS warm-start iterations
 ##* --------------------------------------------------------------------------
+# NOTE on the measurement model (why divergence is avoided): the EKF residual is
+#   resid = meas − [ NN(x_nn)·y_scale + y_bias ] − get_h(map; core=true)
+# get_h already supplies the core (IGRF) + map anomaly (~50000 nT), so the NN
+# compensation must represent ONLY the aircraft interference (~10²–10³ nT). We
+# therefore run the NN bias-FREE (y_bias = 0): a randomly-initialized network
+# outputs ~0, so the initial residual is the bounded interference and the filter
+# learns the compensation online (true cold start). y_scale sets the NN output
+# range (≈ interference magnitude). We size the weight covariance by hand rather
+# than via ekf_online_nn_setup, whose RLS warm start mixes normalized/raw units.
 
 df_dir    = joinpath(@__DIR__,"..","examples","dataframes")
 df_flight = DataFrame(CSV.File(joinpath(df_dir,"df_flight.csv")))
@@ -111,16 +121,18 @@ for magsym in (:mag_4_uc, :mag_5_uc)
         A  = create_TL_A(flux;terms=TL_TERMS)
         x  = [mag_uc A]
         Nf = size(x,2)
-        # cold-start target for RLS warm start = onboard residual (mag − map field)
-        y  = mag_uc .- map_val
-        (_,_,x_norm)            = norm_sets(x)
-        (y_bias,y_scale,y_norm) = norm_sets(y)
-        y_norms = (y_bias,y_scale)
+        (_,_,x_norm) = norm_sets(x)
+        x_norm = Float32.(x_norm)            # match NN parameter eltype (avoid per-step convert)
+        # NN output range ≈ interference magnitude; bias-free (see NOTE above)
+        y_scale = std(mag_uc .- map_val)
+        y_norms = (0.0f0, Float32(y_scale))
+        println("  Nf=$Nf features, y_scale=",round(y_scale,digits=1)," nT")
 
-        m = MagNav.get_nn_m(Nf,1;hidden=NN_HIDDEN)             # randomly-initialized NN
-        (P0_nn,nn_sigma) = ekf_online_nn_setup(x_norm,y_norm,m,y_norms;N_sigma=N_SIGMA)
-        nn_sigma = nn_sigma .* SIGMA_SCALE
-        println("  Nf=$Nf features, nx_nn=$(length(nn_sigma)) NN-weight states")
+        m  = MagNav.get_nn_m(Nf,1;hidden=NN_HIDDEN)   # randomly-initialized NN (cold start)
+        nx_nn    = length(MagNav.destructure(m)[1])
+        P0_nn    = Matrix(Diagonal(fill(P0NN_SIGMA^2, nx_nn)))
+        nn_sigma = fill(WEIGHT_Q, nx_nn)
+        println("  nx_nn=$nx_nn NN-weight states")
 
         (P0,Qd,R) = create_model(traj.dt,traj.lat[1];
                                  init_pos_sigma=0.1,init_alt_sigma=1.0,init_vel_sigma=1.0,
@@ -145,5 +157,5 @@ show(results;allrows=true,allcols=true); println()
 println("\n=== paper reported cold-start DRMS [m] (Hager et al. 2026) ===")
 show(paper;allrows=true,allcols=true); println()
 CSV.write(joinpath(@__DIR__,"paper_impl_results.csv"),results)
-println("\nknobs: hidden=$NN_HIDDEN terms=$TL_TERMS sigma_scale=$SIGMA_SCALE ",
+println("\nknobs: hidden=$NN_HIDDEN terms=$TL_TERMS P0nn=$P0NN_SIGMA weight_q=$WEIGHT_Q ",
         "meas_var=$MEAS_VAR fogm=($FOGM_SIGMA,$FOGM_TAU)")
