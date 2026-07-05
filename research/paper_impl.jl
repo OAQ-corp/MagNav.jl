@@ -118,9 +118,14 @@ for magsym in (:mag_4_uc, :mag_5_uc)
     tag    = replace(String(magsym),"mag_"=>"Mag ","_uc"=>"")
     println("=== $tag (uncompensated cabin magnetometer, cold start) ===")
     try
-        # features: uncompensated scalar + TL A-matrix columns (TL embedded in NN)
-        A  = create_TL_A(flux;terms=TL_TERMS)
-        x  = [mag_uc A]
+        # features: TL A-matrix columns ONLY (fluxgate/attitude-driven, map-
+        # independent). The scalar mag_uc is deliberately EXCLUDED: it carries the
+        # map anomaly, so feeding it to the compensation NN lets the network
+        # subtract the very signal we navigate on — driving the residual to ~0
+        # while position drifts (an observability collapse, seen on Mag 4 at
+        # 5.8 km with max|resid| only 78 nT). With attitude-only features the NN
+        # can model heading-dependent interference but cannot represent the map.
+        x  = create_TL_A(flux;terms=TL_TERMS)
         Nf = size(x,2)
         (_,_,x_norm) = norm_sets(x)
         x_norm = Float32.(x_norm)            # match NN parameter eltype (avoid per-step convert)
