@@ -90,6 +90,7 @@ function fgo_online(lat, lon, alt, vn, ve, vd, fn, fe, fd, Cnb, meas,
                     robust_c       = 0,
                     win            = 0.0,
                     overlap        = 0.0,
+                    x0_prior       = nothing,
                     n_iter         = 5,
                     tol            = 1e-4,
                     silent         = true)
@@ -140,9 +141,11 @@ function fgo_online(lat, lon, alt, vn, ve, vd, fn, fe, fd, Cnb, meas,
            [get_cached_map(map_cache,lat[t],lon[t],alt[t];silent=true) for t = 1:N] :
            fill(itp_mapS,N)
 
-    # prior mean: zero Pinson errors, x0_TL compensation coefficients
+    # prior mean: zero Pinson errors, x0_TL compensation coefficients (or a full
+    # carried-forward state when x0_prior is supplied, e.g., by the window smoother)
     x0 = zeros(eltype(P0),nx)
     x0[18:17+nx_TL] = x0_TL
+    x0_prior === nothing || (x0 = collect(eltype(P0),x0_prior))
 
     # expected measurement & Jacobian at reference states x_bar [nx x N]
     # h(x) = A_t' x_TL + map(pos) + S (+ core); Jacobian per ekf_online
@@ -226,34 +229,35 @@ function fgo_online_window(lat, lon, alt, vn, ve, vd, fn, fe, fd, Cnb, meas,
     P_out = zeros(eltype(P0),nx,nx,N)
     r_out = zeros(eltype(P0),ny,N)
 
-    x0_TL_c = collect(eltype(P0),x0_TL)
-    P0_c    = copy(P0)
-    i0      = 1
-    first   = true
+    x0_pr = nothing                 # full carried-forward prior mean (nothing = fresh)
+    P0_c  = copy(P0)
+    i0    = 1
 
+    # Each window covers [i0, i0+Lw-1] but only COMMITS its leading `stride`
+    # samples [i0, i0+stride-1]; the trailing `overlap` samples act as smoother
+    # look-ahead (future context) and are re-committed by the next window. This
+    # tiles the flight contiguously (no gaps). The full state (navigation error +
+    # TL calibration) is carried forward, so the calibration adapts over the
+    # flight while navigation stays continuous across windows.
     while i0 <= N
         i1 = min(i0+Lw-1, N)
         S  = i0:i1
         res = fgo_online(lat[S],lon[S],alt[S],vn[S],ve[S],vd[S],fn[S],fe[S],fd[S],
                          Cnb[:,:,S],meas[S,:],Bx[S],By[S],Bz[S],dt,itp_mapS,
-                         x0_TL_c,P0_c,Qd,R; win=0.0,overlap=0.0, kwargs...)
+                         x0_TL,P0_c,Qd,R; win=0.0,overlap=0.0,x0_prior=x0_pr, kwargs...)
 
-        gc0 = first ? i0 : i0+Lo             # committed global start
-        gc1 = (i1==N) ? i1 : i0+stride-1     # committed global end
-        lc0 = gc0-i0+1                       # local indices within window
-        lc1 = gc1-i0+1
-        x_out[:,gc0:gc1]   = res.x[:,lc0:lc1]
-        P_out[:,:,gc0:gc1] = res.P[:,:,lc0:lc1]
-        r_out[:,gc0:gc1]   = res.r[:,lc0:lc1]
+        gc1 = (i1==N) ? N : min(i0+stride-1, N)   # committed global end
+        lc1 = gc1-i0+1                            # local index of commit end
+        x_out[:,i0:gc1]   = res.x[:,1:lc1]
+        P_out[:,:,i0:gc1] = res.P[:,:,1:lc1]
+        r_out[:,i0:gc1]   = res.r[:,1:lc1]
 
-        # carry the learned TL (mean + covariance) into the next window's prior
-        x0_TL_c = res.x[18:17+nx_TL, lc1]
-        P0_c    = copy(P0)
-        P0_c[18:17+nx_TL,18:17+nx_TL] = res.P[18:17+nx_TL,18:17+nx_TL,lc1]
+        # carry the full smoothed state (mean + covariance) at the commit boundary
+        x0_pr = res.x[:,lc1]
+        P0_c  = (res.P[:,:,lc1] .+ res.P[:,:,lc1]') ./ 2   # keep symmetric
 
         i1 == N && break
-        i0   += stride
-        first = false
+        i0 += stride
     end
 
     return FILTres(x_out, P_out, r_out, true)
