@@ -92,17 +92,18 @@ P0_TL    = Matrix(Diagonal(fill(1.0, n_TL)))
 
 println("\nINS (no aiding) DRMS(>10min) = ",round(ins_drms,digits=1)," m\n")
 
+# stinger reference: EKF on the pre-compensated Mag 1 (best case; only mag_1_c
+# exists in the dataset — cabin mags 2-5 are uncompensated only)
+try
+    (_,_,fo) = run_filt(traj,ins,xyz.mag_1_c[ind],itp_mapS,:ekf;P0=P0n,Qd=Qdn,R=Rn,
+                        core=true,run_crlb=false); log!("EKF (Mag1 compensated)","Mag 1",fo)
+catch e; @warn("EKF Mag1 failed",e) end
+println()
+
 for magsym in (:mag_4_uc, :mag_5_uc)
     mag_uc = getfield(xyz,magsym)[ind]
-    mag_c  = getfield(xyz,Symbol(replace(String(magsym),"_uc"=>"_c")))[ind]
     tag    = replace(String(magsym),"mag_"=>"Mag ","_uc"=>"")
     println("=== $tag (uncompensated cabin magnetometer) ===")
-
-    # reference: EKF on the COMPENSATED signal (upper bound of what aiding can do)
-    try
-        (_,_,fo) = run_filt(traj,ins,mag_c,itp_mapS,:ekf;P0=P0n,Qd=Qdn,R=Rn,
-                            core=true,run_crlb=false); log!("EKF (compensated)",tag,fo)
-    catch e; @warn("EKF comp failed",e) end
 
     # TL-only online calibration, cold start  (paper Fig. 8b family)
     try
