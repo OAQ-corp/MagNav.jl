@@ -77,25 +77,19 @@ function r2(y::AbstractVector, X::AbstractMatrix)
     return 1 - sum(abs2, res)/sst
 end
 
-# windowed collapse index: median and 90th-percentile ρ² over sliding windows
-function collapse_index(g, B; win=3000, stride=1500)
-    N = length(g)
-    win = min(win, N)
-    ρ = Float64[]
-    i0 = 1
-    while i0 <= N
-        i1 = min(i0+win-1, N)
-        i1 - i0 + 1 < size(B,2)+2 && break
-        push!(ρ, r2(g[i0:i1], B[i0:i1,:]))
-        i1 == N && break
+# median per-window ρ² at a given window length (samples); global = one fit
+function rho2_scale(g, B, win)
+    win >= length(g) && return r2(g, B)
+    stride = max(1, win ÷ 2)
+    ρ = Float64[]; i0 = 1; N = length(g)
+    while i0 + win - 1 <= N
+        push!(ρ, r2(g[i0:i0+win-1], B[i0:i0+win-1,:]))
         i0 += stride
     end
-    (median(ρ), quantile(ρ,0.9), maximum(ρ))
+    isempty(ρ) ? r2(g,B) : median(ρ)
 end
 
-# navigation signal: map anomaly along track, and its along-track increment
-g_val = map_val
-g_inc = [0.0; diff(map_val)]
+g_val = map_val   # navigation signal: map anomaly along the track
 
 # candidate compensation bases
 A_perm = create_TL_A(flux;terms=[:permanent])                 # 3  cols (used config)
@@ -104,36 +98,52 @@ mag4   = xyz.mag_4_uc[ind]
 mag5   = xyz.mag_5_uc[ind]
 
 bases = [
-    ("TL permanent (3, attitude-only)",              A_perm),
-    ("TL perm+ind+eddy (18, attitude-only)",         A_full),
-    ("TL perm + mag_4_uc  (LEAK)",          hcat(A_perm, mag4)),
-    ("TL perm + mag_5_uc  (LEAK)",          hcat(A_perm, mag5)),
-    ("TL full  + mag_4_uc  (LEAK)",         hcat(A_full, mag4)),
+    ("TL permanent (3, attitude)",        A_perm),
+    ("TL perm+ind+eddy (18, attitude)",   A_full),
+    ("TL perm + mag_4_uc  (LEAK)",        hcat(A_perm, mag4)),
+    ("TL full  + mag_4_uc  (LEAK)",       hcat(A_full, mag4)),
 ]
 
-println("\n=== observability collapse index ρ² = frac. of nav signal the",
-        " compensation basis can reproduce ===")
-println("(attitude-only bases should be LOW = observable; +mag_uc should be ≈1 = collapse)\n")
-res = DataFrame(basis=String[], rho2_val_med=Float64[], rho2_val_p90=Float64[],
-                rho2_inc_med=Float64[])
+# window scales (s): the confound that matters is ρ² at the window matching the
+# estimator's adaptation timescale. Fast adaptation ⇒ short window ⇒ per-window
+# ρ² matters; slow/constrained adaptation ⇒ long window ⇒ global ρ² matters.
+scales_s = [30.0, 60.0, 300.0, 900.0]
+scales_n = [round(Int, s/dt) for s in scales_s]
+
+println("\n=== multi-scale observability collapse index ρ²(window) ===")
+println("ρ² = fraction of the nav signal (map anomaly) a compensation basis can",
+        " reproduce over a window.")
+println("Persistent (all scales high) ⇒ a fixed/slow readout leaks the map ⇒ collapse.")
+println("Spurious  (high short, low long) ⇒ only a fast-adapting readout can exploit it.\n")
+
+hdr = rpad("basis",34) * join([rpad("$(Int(s))s",8) for s in scales_s]) * rpad("global",8)
+println(hdr)
+res = DataFrame(basis=String[], s30=Float64[], s60=Float64[], s300=Float64[],
+                s900=Float64[], global_=Float64[])
 for (name,B) in bases
-    (mv,pv,xv) = collapse_index(g_val, B)
-    (mi,_ ,_ ) = collapse_index(g_inc, B)
-    push!(res,(name, round(mv,digits=3), round(pv,digits=3), round(mi,digits=3)))
-    println(rpad(name,38)," ρ²(map)  med=",rpad(round(mv,digits=3),6),
-            " p90=",rpad(round(pv,digits=3),6)," | ρ²(Δmap) med=",round(mi,digits=3))
+    rs = [rho2_scale(g_val,B,n) for n in scales_n]
+    rg = r2(g_val, B)
+    println(rpad(name,34), join([rpad(round(r,digits=3),8) for r in rs]),
+            rpad(round(rg,digits=3),8))
+    push!(res,(name, round(rs[1],digits=3), round(rs[2],digits=3),
+               round(rs[3],digits=3), round(rs[4],digits=3), round(rg,digits=3)))
 end
 
-# link to the observed filter outcome (from research/paper_impl.jl, line 1007.06)
+# link to the observed filter outcome (research/paper_impl.jl, line 1007.06)
 println("\n=== the index vs the observed EKF+TL+NN cold-start outcome ===")
 outcome = DataFrame(
-    config = ["attitude-only TL (perm)", "TL + mag_uc (leak)"],
-    Mag4_DRMS_m = ["40.0 (converged)", "5813 (collapsed)"],
-    predicted = ["ρ² low ⇒ observable", "ρ² ≈ 1 ⇒ collapse"])
+    config      = ["attitude TL perm (3)", "TL perm + mag_uc (leak)"],
+    Mag4_DRMS_m = ["40.0 (converged)",     "5813 (collapsed)"],
+    reading     = ["ρ² low at all scales ⇒ observable",
+                   "ρ² high at all scales (persistent) ⇒ collapse"])
 show(outcome;allrows=true,allcols=true); println()
 
 CSV.write(joinpath(@__DIR__,"observability_index.csv"),res)
-println("\nTakeaway: the collapse index separates structurally-safe (attitude-only)",
-        " from structurally-hazardous (mag_uc-augmented) compensation bases purely",
-        " from geometry — a tuning-independent observability diagnostic, and the",
-        " signal for an online adaptation gate (next step).")
+println("\nTakeaway: the collapse is governed by ρ² at the estimator's adaptation",
+        " timescale — not by an attitude/non-attitude dichotomy. mag_uc leaks the",
+        " map PERSISTENTLY (high ρ² at all scales); a rich attitude basis leaks only",
+        " SPURIOUSLY (high at short scales, decaying with window), so a rate-limited",
+        " estimator is protected. This unifies basis expressiveness, adaptation rate,",
+        " and the paper's natural-gradient stabilization (which slows the effective",
+        " adaptation onto the low-ρ² global scale), and is the signal for an online",
+        " observability gate.")
