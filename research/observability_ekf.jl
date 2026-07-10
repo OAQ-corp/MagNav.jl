@@ -112,10 +112,14 @@ for (tag,terms) in term_sets
             " global ρ²=",rpad(round(ρ2,digits=3),6)," → DRMS(>10min)=",round(d,digits=1)," m")
 end
 
-println("\n=== prediction: DRMS rises with the basis's global ρ² (collapse index) ===")
+println("\n=== DRMS vs compensation-basis expressiveness (see research/OBSERVABILITY.md) ===")
 show(res;allrows=true,allcols=true); println()
 CSV.write(joinpath(@__DIR__,"observability_ekf.csv"),res)
-println("\nIf DRMS increases monotonically with global ρ² across attitude-only TL",
-        " bases of growing expressiveness, the collapse index is a validated",
-        " PREDICTOR of joint-estimation failure — richer aeromagnetic compensation",
-        " is more hazardous for cold-start navigation, and ρ² quantifies the risk.")
+println("\nFINDING (this run FALSIFIES a monotone global-ρ² predictor): DRMS is",
+        " U-shaped in expressiveness, not monotone in ρ². The lowest-ρ² basis",
+        " (permanent, ρ²≈0.02) has the WORST DRMS — under-compensation, the weak-",
+        " basis failure — while the higher-ρ² attitude bases converge. Static",
+        " global ρ² does NOT predict collapse; the collapse hazard is governed by",
+        " feature ENDOGENEITY (coupling to position: mag_uc contains h_map(p),",
+        " attitude does not), which is exogenous here at every expressiveness.",
+        " See research/OBSERVABILITY.md for the corrected theory.")
