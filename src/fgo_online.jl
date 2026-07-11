@@ -91,6 +91,10 @@ function fgo_online(lat, lon, alt, vn, ve, vd, fn, fe, fd, Cnb, meas,
                     win            = 0.0,
                     overlap        = 0.0,
                     x0_prior       = nothing,
+                    obs_gate::Bool = false,
+                    obs_gate_thresh = 0.5,
+                    obs_gate_min   = 0.05,
+                    A_extra        = nothing,
                     n_iter         = 5,
                     tol            = 1e-4,
                     silent         = true)
@@ -106,8 +110,9 @@ function fgo_online(lat, lon, alt, vn, ve, vd, fn, fe, fd, Cnb, meas,
                                  win=win,overlap=overlap,baro_tau=baro_tau,
                                  acc_tau=acc_tau,gyro_tau=gyro_tau,fogm_tau=fogm_tau,
                                  date=date,core=core,terms=terms,Bt_scale=Bt_scale,
-                                 robust=robust,robust_c=robust_c,n_iter=n_iter,
-                                 tol=tol,silent=silent)
+                                 robust=robust,robust_c=robust_c,obs_gate=obs_gate,
+                                 obs_gate_thresh=obs_gate_thresh,obs_gate_min=obs_gate_min,
+                                 n_iter=n_iter,tol=tol,silent=silent)
     end
 
     N      = length(lat)
@@ -126,6 +131,10 @@ function fgo_online(lat, lon, alt, vn, ve, vd, fn, fe, fd, Cnb, meas,
     A = create_TL_A(Bx,By,Bz;
                     terms    = terms,
                     Bt_scale = Bt_scale)
+    # optional extra compensation columns (e.g. an endogenous feature such as the
+    # scalar mag itself) to study/exercise the observability gate
+    A_extra === nothing || (A = hcat(A, collect(eltype(A),A_extra)))
+    @assert size(A,2) == nx_TL "x0_TL length ($nx_TL) must match TL columns ($(size(A,2)))"
 
     map_cache = itp_mapS isa Map_Cache ? itp_mapS : nothing
 
@@ -164,6 +173,29 @@ function fgo_online(lat, lon, alt, vn, ve, vd, fn, fe, fd, Cnb, meas,
         return (h_bar, H_bar)
     end
 
+    # FGO-native observability gate. The factor-graph window exposes the full
+    # measurement Jacobian, so we can measure the position↔TL confound directly:
+    # ρ_obs = how well the TL basis (H rows 18:17+nx_TL, i.e. A) can reproduce the
+    # POSITION sensitivity (H rows 1:2, the linearized map gradient ∂h/∂pos) over
+    # the window. ρ_obs → 1 means the compensation can mimic a position error ⇒
+    # observability collapse. When ρ_obs exceeds a threshold we stiffen the TL
+    # prior/process-noise so the calibration cannot chase the map (a causal EKF
+    # cannot see this — it has no window information matrix). Default: off.
+    Pg = P0; Qg = Qd
+    if obs_gate || !silent
+        (_,H0) = meas_model(repeat(x0,1,N))
+        ρ_obs  = obs_collapse_index(H0, nx_TL)
+        gated  = obs_gate && (ρ_obs > obs_gate_thresh)
+        if gated
+            g  = clamp(one(eltype(P0)) - ρ_obs, obs_gate_min, one(eltype(P0)))
+            tl = 18:17+nx_TL
+            Pg = copy(P0); Pg[tl,tl] .*= g
+            Qg = copy(Qd); Qg[tl,tl] .*= g
+        end
+        silent || @info("fgo_online obs: ρ_obs=$(round(ρ_obs,digits=3))"*
+                        (gated ? " (gated)" : ""))
+    end
+
     x_smooth = repeat(x0,1,N) # initial linearization reference
     P_smooth = zeros(eltype(P0),nx,nx,N)
     w        = ones(eltype(P0),N) # IRLS measurement weights
@@ -182,7 +214,7 @@ function fgo_online(lat, lon, alt, vn, ve, vd, fn, fe, fd, Cnb, meas,
         end
 
         (x_smooth,P_smooth) = fgo_rts_pass(x_bar,h_bar,H_bar,Phi_a,meas,
-                                           P0,Qd,R,w,ny;x0=x0)
+                                           Pg,Qg,R,w,ny;x0=x0)
 
         # convergence check on the RMS change of the smoothed states
         dx = sqrt(mean(abs2, x_smooth .- x_bar))
@@ -321,6 +353,9 @@ function fgo_online(ins::INS, meas, flux::MagV, itp_mapS, x0_TL, P0, Qd, R;
                     robust_c       = 0,
                     win            = 0.0,
                     overlap        = 0.0,
+                    obs_gate::Bool = false,
+                    obs_gate_thresh = 0.5,
+                    obs_gate_min   = 0.05,
                     n_iter         = 5,
                     tol            = 1e-4,
                     silent         = true)
@@ -338,7 +373,38 @@ function fgo_online(ins::INS, meas, flux::MagV, itp_mapS, x0_TL, P0, Qd, R;
                robust_c = robust_c,
                win      = win,
                overlap  = overlap,
+               obs_gate = obs_gate,
+               obs_gate_thresh = obs_gate_thresh,
+               obs_gate_min    = obs_gate_min,
                n_iter   = n_iter,
                tol      = tol,
                silent   = silent)
 end # function fgo_online
+
+"""
+    obs_collapse_index(H, nx_TL)
+
+Internal helper: FGO-native observability collapse index for joint aeromagnetic
+compensation + navigation. Given the stacked measurement Jacobian `H` (`nx` x `N`)
+of a factor-graph window, returns how well the Tolles-Lawson basis (rows
+`18:17+nx_TL`, i.e. the `A`-matrix) can linearly reproduce the POSITION
+sensitivity (rows `1:2`, the map gradient ∂h/∂pos) over the window — the max
+`R²` across the latitude/longitude directions. `→ 1` means the compensation can
+mimic a position error, i.e. the joint estimate is unobservable (collapse); `≈ 0`
+means the compensation is orthogonal to the navigation signal (observable).
+"""
+function obs_collapse_index(H, nx_TL)
+    N = size(H,2)
+    T = permutedims(H[18:17+nx_TL, :])          # N × nx_TL (TL basis rows = A)
+    A = [ones(eltype(H),N) T]
+    ρ = zero(eltype(H))
+    for j in 1:2                                 # lat, lon position sensitivities
+        y   = H[j, :]
+        yc  = y .- mean(y); sst = sum(abs2, yc)
+        sst == 0 && continue
+        β   = A \ y
+        ρj  = 1 - sum(abs2, y .- A*β)/sst
+        ρ   = max(ρ, ρj)
+    end
+    return ρ
+end # function obs_collapse_index
