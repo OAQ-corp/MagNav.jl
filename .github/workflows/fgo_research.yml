@@ -67,6 +67,10 @@ jobs:
         run: julia --project=. research/observability_ekf.jl
         env:
           GKSwstype: '100'
+      - name: FGO breadth (window FGO vs EKF-online across lines/flights/maps)
+        run: julia --project=. research/fgo_breadth.jl
+        env:
+          GKSwstype: '100'
       - name: FGO-native observability gate (inject/recover on Flt1007)
         run: julia --project=. research/fgo_obs_gate.jl
         env:
@@ -88,4 +92,5 @@ jobs:
             research/observability_endogeneity.csv
             research/observability_ekf.csv
             research/fgo_obs_gate.csv
+            research/fgo_breadth_results.csv
           if-no-files-found: ignore
