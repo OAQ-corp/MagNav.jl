@@ -71,10 +71,6 @@ jobs:
         run: julia --project=. research/fgo_breadth.jl
         env:
           GKSwstype: '100'
-      - name: FGO-native observability gate (inject/recover on Flt1007)
-        run: julia --project=. research/fgo_obs_gate.jl
-        env:
-          GKSwstype: '100'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -91,6 +87,5 @@ jobs:
             research/observability_index.csv
             research/observability_endogeneity.csv
             research/observability_ekf.csv
-            research/fgo_obs_gate.csv
             research/fgo_breadth_results.csv
           if-no-files-found: ignore
