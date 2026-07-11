@@ -77,6 +77,27 @@ function r2(y::AbstractVector, X::AbstractMatrix)
     return 1 - sum(abs2, res)/sst
 end
 
+# ENDOGENEITY INDEX: blocked K-fold OUT-OF-SAMPLE R² of regressing y (map) on the
+# basis. Fit the (map ~ [1 B]) coefficients on the training folds, evaluate R² on
+# the held-out contiguous block. A CAUSALLY-ENDOGENOUS feature (mag_uc contains
+# h_map(p)) keeps a stable coefficient ⇒ high out-of-sample R²; a SPURIOUSLY-fitting
+# exogenous basis (attitude, correlated with the map only along this trajectory)
+# has trajectory-specific coefficients ⇒ out-of-sample R² collapses.
+function r2_oos(y::AbstractVector, X::AbstractMatrix; k::Int=5)
+    N = length(y); fold = N ÷ k
+    A = [ones(eltype(X),N) X]
+    accs = Float64[]
+    for i in 1:k
+        te = ((i-1)*fold + 1):(i==k ? N : i*fold)      # contiguous held-out block
+        tr = setdiff(1:N, te)
+        β  = A[tr,:] \ y[tr]                            # fit on training folds
+        yte = y[te]; sst = sum(abs2, yte .- mean(yte))
+        sst == 0 && continue
+        push!(accs, 1 - sum(abs2, yte .- A[te,:]*β)/sst)
+    end
+    isempty(accs) ? 0.0 : mean(accs)
+end
+
 # median per-window ρ² at a given window length (samples); global = one fit
 function rho2_scale(g, B, win)
     win >= length(g) && return r2(g, B)
@@ -129,21 +150,42 @@ for (name,B) in bases
                round(rs[3],digits=3), round(rs[4],digits=3), round(rg,digits=3)))
 end
 
-# link to the observed filter outcome (research/paper_impl.jl, line 1007.06)
-println("\n=== the index vs the observed EKF+TL+NN cold-start outcome ===")
+CSV.write(joinpath(@__DIR__,"observability_index.csv"),res)
+
+##* ENDOGENEITY INDEX — the invariant that in-sample ρ² missed.
+# In-sample ρ² fails to separate the SAFE high-ρ² attitude basis (converges) from
+# the UNSAFE high-ρ² mag_uc basis (collapses): both fit the map in-sample. The
+# out-of-sample (cross-segment) R² does separate them — it is high only when the
+# feature-map relationship is causal/persistent (mag_uc contains h_map(p)), and
+# collapses when the fit is trajectory-specific (attitude correlates with the map
+# only along this flight).
+println("\n=== endogeneity index: in-sample ρ² vs OUT-OF-SAMPLE (cross-segment) R² ===")
+println("Endogenous (feature ⊃ map, e.g. mag_uc): OOS R² stays high (causal leak ⇒ collapse).")
+println("Exogenous  (attitude, spurious fit):     OOS R² collapses  (safe at any ρ²).\n")
+println(rpad("basis",34), rpad("in-sample ρ²",14), rpad("OOS R² (k=5)",14), "verdict")
+endo = DataFrame(basis=String[], rho2_in=Float64[], r2_oos=Float64[], verdict=String[])
+for (name,B) in bases
+    ri = r2(g_val, B)
+    ro = r2_oos(g_val, B; k=5)
+    v  = ro > 0.5 ? "ENDOGENOUS ⇒ collapse-prone" :
+         ri > 0.5 ? "exogenous (spurious fit) ⇒ safe" : "exogenous (weak) ⇒ safe"
+    println(rpad(name,34), rpad(round(ri,digits=3),14), rpad(round(ro,digits=3),14), v)
+    push!(endo,(name, round(ri,digits=3), round(ro,digits=3), v))
+end
+CSV.write(joinpath(@__DIR__,"observability_endogeneity.csv"),endo)
+
+# link to the observed filter outcome (research/paper_impl.jl + observability_ekf.jl)
+println("\n=== the endogeneity index vs the observed cold-start EKF outcome ===")
 outcome = DataFrame(
-    config      = ["attitude TL perm (3)", "TL perm + mag_uc (leak)"],
-    Mag4_DRMS_m = ["40.0 (converged)",     "5813 (collapsed)"],
-    reading     = ["ρ² low at all scales ⇒ observable",
-                   "ρ² high at all scales (persistent) ⇒ collapse"])
+    config      = ["attitude TL perm+ind+eddy (18)", "TL perm + mag_uc (leak)"],
+    Mag4_DRMS_m = ["46.7 (converged)",               "5813 (collapsed)"],
+    reading     = ["high in-sample ρ², low OOS ⇒ exogenous ⇒ safe",
+                   "high OOS R² ⇒ endogenous ⇒ collapse"])
 show(outcome;allrows=true,allcols=true); println()
 
-CSV.write(joinpath(@__DIR__,"observability_index.csv"),res)
-println("\nTakeaway: the collapse is governed by ρ² at the estimator's adaptation",
-        " timescale — not by an attitude/non-attitude dichotomy. mag_uc leaks the",
-        " map PERSISTENTLY (high ρ² at all scales); a rich attitude basis leaks only",
-        " SPURIOUSLY (high at short scales, decaying with window), so a rate-limited",
-        " estimator is protected. This unifies basis expressiveness, adaptation rate,",
-        " and the paper's natural-gradient stabilization (which slows the effective",
-        " adaptation onto the low-ρ² global scale), and is the signal for an online",
-        " observability gate.")
+println("\nTakeaway: out-of-sample (cross-segment) R² is the endogeneity index that",
+        " in-sample ρ² lacked — it stays high only for features causally containing",
+        " the map (mag_uc) and collapses for exogenous features that fit the map only",
+        " spuriously along one trajectory (attitude, any dimension). Together with the",
+        " under-compensation boundary (weak basis, see observability_ekf.jl) it bounds",
+        " the compensation-expressiveness sweet spot. See research/OBSERVABILITY.md.")

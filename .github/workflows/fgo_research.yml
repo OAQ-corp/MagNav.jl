@@ -81,5 +81,6 @@ jobs:
             research/paper_reference_values.csv
             research/paper_impl_results.csv
             research/observability_index.csv
+            research/observability_endogeneity.csv
             research/observability_ekf.csv
           if-no-files-found: ignore
