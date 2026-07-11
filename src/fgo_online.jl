@@ -356,6 +356,7 @@ function fgo_online(ins::INS, meas, flux::MagV, itp_mapS, x0_TL, P0, Qd, R;
                     obs_gate::Bool = false,
                     obs_gate_thresh = 0.5,
                     obs_gate_min   = 0.05,
+                    A_extra        = nothing,
                     n_iter         = 5,
                     tol            = 1e-4,
                     silent         = true)
@@ -376,6 +377,7 @@ function fgo_online(ins::INS, meas, flux::MagV, itp_mapS, x0_TL, P0, Qd, R;
                obs_gate = obs_gate,
                obs_gate_thresh = obs_gate_thresh,
                obs_gate_min    = obs_gate_min,
+               A_extra  = A_extra,
                n_iter   = n_iter,
                tol      = tol,
                silent   = silent)
