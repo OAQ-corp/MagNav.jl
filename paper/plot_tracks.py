@@ -64,12 +64,17 @@ def fig_map():
 
 
 def fig_poserr():
-    fig, ax = plt.subplots(figsize=(COL_W, 2.0))
+    fig, ax = plt.subplots(figsize=(COL_W, 2.1))
+    # shade the gap between the baseline EKF and the proposed FGO to make the
+    # improvement visible at a glance
+    ax.fill_between(t["tmin"], t["efgo"], t["eekf"],
+                    where=(t["eekf"] >= t["efgo"]), color=C_PROPOSED,
+                    alpha=0.12, interpolate=True, label="FGO improvement")
     ax.plot(t["tmin"], t["eins"], ":", color=C_REF, lw=1.3,
             label="INS  (%.0f m)" % np.sqrt(np.mean(t["eins"] ** 2)))
     ax.plot(t["tmin"], t["eekf"], "--", color=C_BASE1, lw=1.4,
             label="EKF  (%.1f m)" % np.sqrt(np.mean(t["eekf"] ** 2)))
-    ax.plot(t["tmin"], t["efgo"], "-", color=C_PROPOSED, lw=1.7,
+    ax.plot(t["tmin"], t["efgo"], "-", color=C_PROPOSED, lw=1.9,
             label="FGO  (%.1f m)" % np.sqrt(np.mean(t["efgo"] ** 2)))
     ax.set_xlabel("time [min]")
     ax.set_ylabel("horizontal error [m]")
@@ -83,6 +88,34 @@ def fig_poserr():
     plt.close(fig)
 
 
+def fig_cdf():
+    """Empirical CDF of horizontal error — separates the methods cleanly."""
+    fig, ax = plt.subplots(figsize=(COL_W, 2.1))
+    def cdf(e, **kw):
+        xs = np.sort(e); ys = np.arange(1, len(xs)+1) / len(xs)
+        ax.plot(xs, ys, **kw)
+    cdf(t["eins"], ls=":", color=C_REF, lw=1.4, label="INS")
+    cdf(t["eekf"], ls="--", color=C_BASE1, lw=1.5, label="EKF")
+    cdf(t["efgo"], ls="-", color=C_PROPOSED, lw=1.9, label="FGO (proposed)")
+    # mark the 95th percentile of each
+    for e, c in ((t["efgo"], C_PROPOSED), (t["eekf"], C_BASE1)):
+        p95 = np.percentile(e, 95)
+        ax.plot([p95, p95], [0, 0.95], color=c, lw=0.7, ls="-", alpha=0.35)
+    ax.axhline(0.95, color="0.5", lw=0.6, ls=":")
+    ax.text(np.percentile(t["eins"], 92), 0.955, "95th pct", fontsize=6.5,
+            color="0.4", va="bottom", ha="right")
+    ax.set_xlabel("horizontal error [m]")
+    ax.set_ylabel("empirical CDF")
+    ax.set_xlim(0, np.percentile(t["eins"], 99))
+    ax.set_ylim(0, 1.02)
+    ax.grid(True)
+    ax.legend(loc="lower right", framealpha=0.9)
+    ax.set_title("Error distribution, line 1003.02")
+    despine(ax)
+    fig.savefig(os.path.join(OUT, "fig_cdf.pdf"))
+    plt.close(fig)
+
+
 if __name__ == "__main__":
-    fig_map(); fig_poserr()
-    print("wrote fig_map.pdf, fig_poserr.pdf to", OUT)
+    fig_map(); fig_poserr(); fig_cdf()
+    print("wrote fig_map.pdf, fig_poserr.pdf, fig_cdf.pdf to", OUT)

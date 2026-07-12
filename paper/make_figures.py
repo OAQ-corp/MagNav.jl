@@ -8,10 +8,10 @@ Run: python3 paper/make_figures.py  ->  paper/figs/*.pdf
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle, Rectangle, FancyBboxPatch, Patch
+from matplotlib.patches import Circle, Rectangle, FancyBboxPatch, Patch, FancyArrowPatch
 
 from fig_style import (apply_style, despine, COL_W,
-                       C_PROPOSED, C_BASE1, C_REF)
+                       C_PROPOSED, C_BASE1, C_REF, C_ACCENT)
 
 apply_style()
 OUT = os.path.join(os.path.dirname(__file__), "figs")
@@ -170,8 +170,71 @@ def fig_window():
     plt.close(fig)
 
 
+def fig_pipeline():
+    """Double-column system architecture: sensors -> factor graph -> window
+    solver -> outputs, with the anomaly map feeding the map-match factor."""
+    fig, ax = plt.subplots(figsize=(7.0, 2.35))
+    ax.set_xlim(0, 15.2); ax.set_ylim(0, 5.0); ax.axis("off")
+
+    def box(x, y, w, h, txt, fc="#eef2f7", ec="#4a5568", fs=8, lw=1.0, tc="#111"):
+        ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.03",
+                     fc=fc, ec=ec, lw=lw))
+        ax.text(x+w/2, y+h/2, txt, ha="center", va="center", fontsize=fs,
+                color=tc, zorder=5)
+
+    def arrow(x0, y0, x1, y1, color="#4a5568", lw=1.3):
+        ax.add_patch(FancyArrowPatch((x0, y0), (x1, y1),
+                     arrowstyle="-|>", mutation_scale=11, lw=lw, color=color,
+                     shrinkA=1, shrinkB=1))
+
+    # --- sensors (left column) ---
+    box(0.1, 3.5, 2.5, 1.0, "INS / IMU\n(Pinson error)", fc="#eef2f7")
+    box(0.1, 2.0, 2.5, 1.0, "3-axis fluxgate\n(TL basis $\\mathbf{A}_t$)", fc="#eef2f7")
+    box(0.1, 0.5, 2.5, 1.0, "scalar\nmagnetometer $z_t$", fc="#eef2f7")
+
+    # --- factor graph (center, highlighted) ---
+    gx, gy, gw, gh = 3.5, 0.35, 5.1, 4.3
+    ax.add_patch(FancyBboxPatch((gx, gy), gw, gh, boxstyle="round,pad=0.04",
+                 fc="#eaf2fb", ec=C_PROPOSED, lw=1.6))
+    ax.text(gx+gw/2, gy+gh-0.32, "Factor graph", ha="center", va="center",
+            fontsize=9, color=C_PROPOSED, weight="bold")
+    box(gx+0.35, 3.05, gw-0.7, 0.75, "process factors  $\\|\\mathbf{x}_{t+1}"
+        "-\\mathbf{\\Phi}_t\\mathbf{x}_t\\|$", fc="white", fs=7.5, ec="#8aa")
+    box(gx+0.35, 2.15, gw-0.7, 0.75, "TL compensation  $c_t=\\mathbf{A}_t^{\\top}"
+        "\\boldsymbol{\\beta}_t$", fc="#fff4de", fs=7.5, ec="#c99")
+    box(gx+0.35, 1.25, gw-0.7, 0.75, "map-match  $z_t-h(\\mathbf{p}_t)-c_t$",
+        fc="white", fs=7.5, ec="#8aa")
+    box(gx+0.35, 0.55, gw-0.7, 0.60, "sensor-error factors (heading, bias, "
+        "drift)", fc="white", fs=6.8, ec="#8aa")
+
+    # --- solver ---
+    box(9.5, 1.9, 2.6, 1.2, "Fixed-lag window\nGN/QR $+$ Huber",
+        fc="#eaf2fb", ec=C_PROPOSED, fs=8, lw=1.4, tc="#0a3355")
+
+    # --- outputs ---
+    box(12.9, 3.0, 2.2, 1.05, "position\n$\\hat{\\mathbf{p}}_t$", fc="#e7f3ec",
+        ec="#1a7", fs=8)
+    box(12.9, 1.05, 2.2, 1.05, "TL coef.\n$\\hat{\\boldsymbol{\\beta}}_t$",
+        fc="#e7f3ec", ec="#1a7", fs=8)
+
+    # sensor -> graph arrows
+    arrow(2.6, 4.0, 3.5, 3.42)
+    arrow(2.6, 2.5, 3.5, 2.52)
+    arrow(2.6, 1.0, 3.5, 1.62)
+    # graph -> solver -> outputs
+    arrow(gx+gw, 2.5, 9.5, 2.5)
+    arrow(12.1, 2.7, 12.9, 3.3)
+    arrow(12.1, 2.3, 12.9, 1.7)
+    # anomaly map box below graph feeding map-match factor
+    box(9.5, 0.15, 2.6, 1.15, "anomaly map\n$h(\\cdot)$ (IGRF core)", fc="#f3eaf7",
+        ec=C_ACCENT, fs=7.5)
+    arrow(9.5, 0.9, gx+gw-0.2, 1.55, color=C_ACCENT)
+    fig.savefig(os.path.join(OUT, "fig_pipeline.pdf"))
+    plt.close(fig)
+
+
 if __name__ == "__main__":
-    fig_breadth(); fig_coldstart(); fig_factorgraph(); fig_window()
+    fig_breadth(); fig_coldstart(); fig_factorgraph(); fig_window(); fig_pipeline()
     print("wrote figures to", OUT)
     for f in sorted(os.listdir(OUT)):
         print("  ", f)
