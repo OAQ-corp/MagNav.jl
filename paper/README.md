@@ -24,26 +24,43 @@ All quantitative claims come from the reproducible experiments on this branch
   condition).
 - `references.bib` — bibliography. DOIs are included only where confidently known;
   the rest are left for manual verification (see citation check below).
-- `taes_fgo_magnav.html` — a self-contained, two-column rendition of the same
-  content (offline; no external assets).
-- `taes_fgo_magnav.pdf` — the compiled draft (3 pp.).
+- `make_figures.py`, `plot_tracks.py` — figure generation (see below).
+- `figs/` — the six vector-PDF figures included by the manuscript.
+- `taes_fgo_magnav.pdf` — the compiled draft (committed by the `Paper PDF` CI job).
+
+## Figures
+
+Six vector PDFs in `figs/`, regenerated from the CI numbers and committed CSVs:
+
+| Figure | Script | Content |
+|---|---|---|
+| `fig_graph.pdf` | `make_figures.py` | Factor-graph schematic (shared TL variable) |
+| `fig_window.pdf` | `make_figures.py` | Fixed-lag sliding window (commit stride + look-ahead) |
+| `fig_coldstart.pdf` | `make_figures.py` | Line 1007.06 FGO vs EKF+TL+NN (Table I) |
+| `fig_breadth.pdf` | `make_figures.py` | 5-line breadth, log DRMS, divergence (Table II) |
+| `fig_map.pdf` | `plot_tracks.py` | Eastern anomaly map + flight line 1003.02 + zoom inset |
+| `fig_poserr.pdf` | `plot_tracks.py` | Position-error curves (INS / EKF / FGO) |
+
+```
+python make_figures.py    # schematic + bar figures
+python plot_tracks.py      # geographic figures from track_data.csv / map_grid.csv
+```
 
 ## Building the PDF
 
-**Preferred (LaTeX):** requires `IEEEtran.cls`
-(https://www.michaelshell.org/tex/ieeetran/) and a TeX distribution.
+**In CI (authoritative):** the `Paper PDF` workflow
+(`.github/workflows/paper_pdf.yml`) regenerates the figures, compiles with the
+real `IEEEtran.cls` from TeX Live (`xu-cheng/latex-action`), and commits
+`taes_fgo_magnav.pdf` back to the branch. This is how the genuine
+IEEEtran-formatted PDF is produced (local `pdflatex` is unavailable in the dev
+sandbox).
+
+**Locally (requires a TeX distribution with `IEEEtran.cls`):**
 
 ```
+python make_figures.py && python plot_tracks.py
 pdflatex taes_fgo_magnav && bibtex taes_fgo_magnav && \
 pdflatex taes_fgo_magnav && pdflatex taes_fgo_magnav
-```
-
-**Offline fallback used here (no TeX installed):** render the HTML with headless
-Chromium.
-
-```
-chrome --headless --no-pdf-header-footer \
-  --print-to-pdf=taes_fgo_magnav.pdf taes_fgo_magnav.html
 ```
 
 ## Citation integrity (Wave 4, before submission)

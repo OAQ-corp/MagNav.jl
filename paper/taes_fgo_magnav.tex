@@ -136,6 +136,14 @@ $\mathbf{g}_t=\partial h/\partial\mathbf{p}$. Because the batch solution uses th
 entire window, early navigation states benefit from calibration information that
 only becomes observable after later maneuvers---a property a causal filter lacks.
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.86\columnwidth]{figs/fig_graph.pdf}
+\caption{The Tolles--Lawson coefficient variable $\beta$ is shared by every
+measurement factor and estimated jointly with the navigation-error chain.}
+\label{fig:graph}
+\end{figure}
+
 \subsection{Fixed-lag sliding window}
 A single batch over a long line forces one static $\boldsymbol{\beta}$, which
 underfits time-varying interference. We instead process the flight in overlapping
@@ -145,6 +153,14 @@ leading stride $L_w-L_o$ epochs and carries the full smoothed state and covarian
 forward as the prior for the next window; the trailing overlap serves as smoother
 look-ahead. The compensation thus adapts along the flight while navigation stays
 continuous across windows.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\columnwidth]{figs/fig_window.pdf}
+\caption{Each window commits its leading stride and passes the full smoothed
+state and covariance forward as the prior for the next window.}
+\label{fig:window}
+\end{figure}
 
 \subsection{Physical sensor-error factors}
 Beyond TL we cast physically-motivated scalar-magnetometer error terms as graph
@@ -226,6 +242,23 @@ magnetometer, the batch factor graph improves horizontal DRMS from the EKF's
 and sparse-GN/QR solvers agree to within \SI{1}{\meter}, confirming both reach the
 same MAP estimate.
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\columnwidth]{figs/fig_map.pdf}
+\caption{Eastern anomaly map and flight line 1003.02. The inset zooms a
+mid-flight window where the free-inertial (INS) track drifts off the truth while
+the EKF and the factor-graph (FGO) estimates track it.}
+\label{fig:map}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\columnwidth]{figs/fig_poserr.pdf}
+\caption{Horizontal position error on line 1003.02. The batch factor graph (FGO)
+holds a tighter bound than the EKF across the line; free inertial diverges.}
+\label{fig:poserr}
+\end{figure}
+
 \subsection{Cold-start line vs.\ online EKF+TL+NN}
 Table~\ref{tab:1007} reports the primary evaluation line 1007.06
 (\SI{87}{\minute}, full length), on the two uncompensated cabin magnetometers. A
@@ -254,6 +287,15 @@ EKF+TL-only, published~\cite{hager2026} & 58 & 15 \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\columnwidth]{figs/fig_coldstart.pdf}
+\caption{Line 1007.06 cold start on the uncompensated cabin magnetometers. The
+NN-free fixed-lag window (left of the divider) matches or beats the reproduced and
+published EKF+TL+NN (shaded, right).}
+\label{fig:coldstart}
+\end{figure}
 
 \subsection{Breadth across lines, flights, and maps}
 Table~\ref{tab:breadth} runs the same cold-start TL model through the causal
@@ -291,6 +333,15 @@ Flt1007 & 1007.06 & R & 5 & 17.8 & \textbf{13.8} \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\columnwidth]{figs/fig_breadth.pdf}
+\caption{Breadth study (Table~\ref{tab:breadth}) on a log DRMS axis. Hatched bars
+mark causal EKF divergence beyond \SI{10}{\kilo\meter}; the fixed-lag window (blue)
+stays bounded throughout.}
+\label{fig:breadth}
+\end{figure}
 
 \subsection{Sensor-error factors (simulation)}
 On a simulated flight with injected heading error, hard-iron bias, drift, and
