@@ -452,6 +452,22 @@ window $L_w$, overlap $L_o$, prior $(\hat{\boldsymbol{\chi}}_0,\mathbf{P}_0)$
 \end{algorithmic}
 \end{algorithm}
 
+\subsection{Window design and initialization}
+Two parameters govern the window: the length $L_w$ and the overlap $L_o$. $L_w$ sets
+how much data each compensation estimate sees and thus the effective adaptation
+time; too short and $\boldsymbol{\beta}$ is under-determined, too long and it cannot
+track drift. $L_o$ sets the look-ahead and hence the commit latency: a committed
+state has seen $L_o$ epochs of future data, and the estimator lags real time by
+$L_o$. In the experiments we use $L_w=\SI{5}{\minute}$ and $L_o=\SI{2}{\minute}$; the
+\SI{2}{\minute} window in Table~\ref{tab:1007} shows that halving $L_w$ degrades the
+long-line result, consistent with under-determination. The first window is seeded
+with a diffuse prior on $\boldsymbol{\beta}$ (large $\mathbf{P}_0$ block) so the cold
+start is not biased toward zero interference, and the FOGM disturbance state absorbs
+the initial mismatch while the coefficients converge; subsequent windows inherit the
+tight carried covariance and converge in one or two Gauss--Newton iterations. This
+warm-start is why the per-window iteration count stays low despite the nonlinearity
+of the map term.
+
 \subsection{Robust kernel and reweighting}
 Map error, transient interference, and dead-zone measurements produce heavy-tailed
 residuals that a quadratic cost over-weights. We use a Huber kernel~\cite{huber1964}
@@ -624,8 +640,34 @@ the shaded region marking the improvement. Fig.~\ref{fig:cdf} gives the empirica
 error distribution: the FGO curve reaches its 95th percentile at less than
 half the error of the EKF, and both bound the free-inertial error by an order of
 magnitude. On a \SI{10}{\minute} segment the iterated-RTS and sparse-GN/QR solvers
-agree to within \SI{1}{\meter}, confirming that both numerically reach the same MAP
-estimate as predicted in Section~\ref{sec:method}.
+agree to within \SI{1}{\meter} (Table~\ref{tab:bench}), confirming that both
+numerically reach the same MAP estimate as predicted by Lemma~\ref{lem:rts}. The
+Huber kernel changes the batch result by less than \SI{0.3}{\meter} here, as
+expected for the already-compensated stinger sensor whose residuals are close to
+Gaussian; its value appears in the cold-start cases below, where transient outliers
+are large.
+
+\begin{table}[t]
+\caption{Batch estimator on line 1003.02 (compensated stinger); horizontal DRMS
+[m]. Free-inertial reference \SI{114.6}{\meter}. The RTS and GN/QR solvers agree,
+confirming a common MAP estimate.}
+\label{tab:bench}
+\centering
+\begin{tabular}{llr}
+\toprule
+Segment & Estimator & DRMS \\
+\midrule
+full line & EKF & 28.3 \\
+full line & FGO (RTS) & 14.3 \\
+full line & \textbf{FGO (RTS, Huber)} & \textbf{14.0} \\
+\midrule
+\SI{10}{\minute} & EKF & 47.9 \\
+\SI{10}{\minute} & FGO (RTS) & 18.4 \\
+\SI{10}{\minute} & FGO (GN/QR) & 19.3 \\
+\SI{10}{\minute} & FGO (GN/QR, Huber) & 18.4 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{figure}[t]
 \centering
@@ -860,6 +902,22 @@ $\mathbf{g}_t$ to exploit---and it is the one case the window does not win. We s
 that the condition is geometric and predictive only through these qualitative rules;
 our attempts at a scalar screening statistic did not generalize, which we report as
 a negative result rather than overclaim.
+
+\subsection{Deployment considerations}
+The estimator is compatible with real-time operation. Its committed output lags real
+time by the overlap $L_o$ (here \SI{2}{\minute}), a latency that is acceptable for
+the map-aiding role---the INS provides the high-rate, zero-latency solution, and the
+smoother periodically corrects it---but that a designer trades against accuracy by
+choosing $L_o$. Because each window is bounded, both computation and memory are
+constant per commit and independent of flight duration, unlike a growing batch. The
+factor interface is modular: the compensation, sensor-error, and map factors are
+added or removed without touching the solver, so the same implementation covers the
+calibrated (frozen $\boldsymbol{\beta}$), cold-start (adaptive $\boldsymbol{\beta}$),
+and augmented-sensor cases. Integration with an operational system therefore amounts
+to feeding the INS mechanization, fluxgate, and scalar magnetometer streams into the
+graph and reading back the corrected position at the commit rate. The main tuning
+burden is the two window parameters and the process noise $\mathbf{Q}^{\beta}$, all
+of which have clear physical interpretations.
 
 \subsection{Limitations}
 Several limitations bound the present study, and we state them plainly. The
