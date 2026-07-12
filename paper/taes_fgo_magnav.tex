@@ -542,7 +542,8 @@ $\mathbf{g}_t^{\!\top}$ (the map-gradient/position sensitivity) and let
 $\boldsymbol{\Psi}$ have rows $\mathbf{A}_t^{\!\top}$ (the TL regressor). To
 isolate the position--compensation coupling, restrict~\eqref{eq:meas} to the
 $(\delta\mathbf{p},\delta\boldsymbol{\beta})$ subspace, giving the window model
-$\mathbf{z}=\mathbf{G}\,\delta\mathbf{p}+\boldsymbol{\Psi}\,\delta\boldsymbol{\beta}+\boldsymbol{\eta}$.
+$\mathbf{z}=\mathbf{G}\,\delta\mathbf{p}+\boldsymbol{\Psi}\,\delta\boldsymbol{\beta}+\boldsymbol{\eta}$
+(Fig.~\ref{fig:obs}).
 
 \begin{figure}[t]
 \centering
@@ -806,7 +807,7 @@ published EKF+TL+NN (shaded, right).}
 Table~\ref{tab:breadth} runs the same cold-start TL model through the causal
 online-TL EKF and the fixed-lag window smoother on five long survey lines spanning
 three flights and two maps. The window smoother is better on \num{8} of \num{9}
-cold-start cases. On the noisy Mag~4 the causal EKF diverges from the cold start to
+cold-start cases (Fig.~\ref{fig:breadth}). On the noisy Mag~4 the causal EKF diverges from the cold start to
 tens of kilometers on three lines, whereas the window smoother stays bounded,
 because its per-window relinearization lets later-observable calibration protect
 earlier navigation. The lone exception is a \SI{14}{\minute} line on which every
