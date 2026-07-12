@@ -170,6 +170,58 @@ def fig_window():
     plt.close(fig)
 
 
+def fig_winlen():
+    """DRMS vs window length (line 1007.06 cold start) — the U-shaped tradeoff."""
+    wl = [2.0, 5.0, 87.0]           # window length [min]; 87 = whole-line static
+    m4 = [45.9, 37.0, 123.7]
+    m5 = [17.1, 15.1, 68.1]
+    fig, ax = plt.subplots(figsize=(COL_W, 2.15))
+    ax.plot(wl, m4, "-o", color=C_PROPOSED, lw=1.7, ms=4.5, label="Mag 4")
+    ax.plot(wl, m5, "--s", color=C_BASE1, lw=1.5, ms=4.0, label="Mag 5")
+    for x, y in zip(wl, m4):
+        ax.annotate("%.0f" % y, (x, y), textcoords="offset points",
+                    xytext=(3, 5), fontsize=6.2, color=C_PROPOSED)
+    ax.set_xscale("log")
+    ax.set_xticks(wl); ax.set_xticklabels(["2", "5", "87\n(static)"])
+    ax.set_xlabel("window length $L_w$ [min]")
+    ax.set_ylabel("horizontal DRMS [m]")
+    ax.set_ylim(0, 135)
+    ax.grid(True)
+    ax.axvspan(3.5, 7, color=C_PROPOSED, alpha=0.06)
+    ax.text(5, 128, "sweet spot", fontsize=6.5, ha="center", color="#0a3355")
+    ax.legend(loc="upper center", framealpha=0.9)
+    ax.set_title("Window length vs accuracy, line 1007.06")
+    despine(ax)
+    fig.savefig(os.path.join(OUT, "fig_winlen.pdf"))
+    plt.close(fig)
+
+
+def fig_obs():
+    """Observability schematic: range(G), range(Psi), and their intersection."""
+    fig, ax = plt.subplots(1, 2, figsize=(COL_W, 1.9))
+    for a in ax:
+        a.set_xlim(-1.35, 1.35); a.set_ylim(-1.2, 1.35); a.axis("off")
+        a.set_aspect("equal")
+
+    def plane(a, ang, color, label, lx, ly):
+        th = np.deg2rad(ang)
+        dx, dy = np.cos(th), np.sin(th)
+        a.plot([-dx, dx], [-dy, dy], color=color, lw=2.2)
+        a.text(lx, ly, label, color=color, fontsize=8, ha="center")
+
+    plane(ax[0], 20, C_PROPOSED, r"range$(\mathbf{G})$", 1.05, 0.55)
+    plane(ax[0], 110, C_BASE1, r"range$(\boldsymbol{\Psi})$", -0.7, 0.95)
+    ax[0].plot(0, 0, "ko", ms=3)
+    ax[0].text(0, -1.12, "observable\n(intersect $=\\{\\mathbf{0}\\}$)",
+               ha="center", fontsize=7)
+    plane(ax[1], 25, C_PROPOSED, r"range$(\mathbf{G})$", 1.02, 0.62)
+    plane(ax[1], 30, C_BASE1, r"range$(\boldsymbol{\Psi})$", -0.55, -0.75)
+    ax[1].plot([-1.1, 1.1], [-0.53, 0.53], color=C_ACCENT, lw=1.0, ls=":")
+    ax[1].text(0, -1.12, "collapse\n(nontrivial overlap)", ha="center", fontsize=7)
+    fig.savefig(os.path.join(OUT, "fig_obs.pdf"))
+    plt.close(fig)
+
+
 def fig_pipeline():
     """Double-column system architecture: sensors -> factor graph -> window
     solver -> outputs, with the anomaly map feeding the map-match factor."""
@@ -235,6 +287,7 @@ def fig_pipeline():
 
 if __name__ == "__main__":
     fig_breadth(); fig_coldstart(); fig_factorgraph(); fig_window(); fig_pipeline()
+    fig_winlen(); fig_obs()
     print("wrote figures to", OUT)
     for f in sorted(os.listdir(OUT)):
         print("  ", f)

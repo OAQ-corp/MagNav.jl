@@ -544,6 +544,18 @@ isolate the position--compensation coupling, restrict~\eqref{eq:meas} to the
 $(\delta\mathbf{p},\delta\boldsymbol{\beta})$ subspace, giving the window model
 $\mathbf{z}=\mathbf{G}\,\delta\mathbf{p}+\boldsymbol{\Psi}\,\delta\boldsymbol{\beta}+\boldsymbol{\eta}$.
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\columnwidth]{figs/fig_obs.pdf}
+\caption{Observability of joint compensation and navigation
+(Proposition~\ref{prop:obs}). Left: when the map-gradient subspace
+range$(\mathbf{G})$ and the compensation subspace range$(\boldsymbol{\Psi})$ meet
+only at the origin, position and compensation are separable. Right: when they share
+a nonzero direction, a position shift can be masked by a compensation change and
+observability collapses.}
+\label{fig:obs}
+\end{figure}
+
 \begin{proposition}\label{prop:obs}
 A position perturbation $\delta\mathbf{p}$ is indistinguishable from a
 compensation adjustment---hence unobservable from map matching over the
@@ -742,6 +754,23 @@ NN-augmented filter on both sensors \emph{without any neural network}, using onl
 the linear TL basis carried as graph variables. We attribute the margin to the
 window look-ahead: the coefficients are identified from data on both sides of each
 committed epoch, whereas the EKF must commit with past data only.
+
+The window length itself trades under-determination against staleness.
+Fig.~\ref{fig:winlen} plots DRMS against $L_w$ on this line: the \SI{2}{\minute}
+window under-determines the coefficients, the full-line static batch cannot track
+their drift, and a \SI{5}{\minute} window sits at the resulting sweet spot. The curve
+is U-shaped rather than monotone, mirroring the expressiveness tradeoff discussed in
+Section~\ref{sec:observability}, and it makes $L_w$ a physically interpretable knob
+rather than a free hyperparameter.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\columnwidth]{figs/fig_winlen.pdf}
+\caption{Window length versus accuracy on line 1007.06 (cold start). A
+\SI{5}{\minute} window is the sweet spot between the under-determined
+\SI{2}{\minute} window and the drift-blind static batch (full line).}
+\label{fig:winlen}
+\end{figure}
 
 \begin{table}[t]
 \caption{Cold start, line 1007.06, uncompensated cabin magnetometers; DRMS [m].
