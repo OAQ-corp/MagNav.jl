@@ -11,6 +11,7 @@
 \usepackage{siunitx}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
+\usepackage{pifont}
 
 \newtheorem{proposition}{Proposition}
 \newtheorem{corollary}{Corollary}
@@ -59,6 +60,27 @@ rule for the compensation features follows.
 Magnetic-anomaly navigation, aeromagnetic compensation, Tolles--Lawson,
 factor-graph optimization, fixed-lag smoothing, GNSS-denied navigation.
 \end{IEEEkeywords}
+
+\section*{Nomenclature}
+\addcontentsline{toc}{section}{Nomenclature}
+\begin{IEEEdescription}[\IEEEsetlabelwidth{$\boldsymbol{\Phi}_t,\mathbf{Q}_t$}]
+\item[$\mathbf{x}_t$] INS error state at epoch $t$ (position, velocity, attitude,
+biases, FOGM).
+\item[$\boldsymbol{\beta}_t$] Online Tolles--Lawson compensation coefficients.
+\item[$\boldsymbol{\chi}_t$] Joint state $(\mathbf{x}_t,\boldsymbol{\beta}_t)$.
+\item[$\boldsymbol{\Phi}_t,\mathbf{Q}_t$] Pinson state-transition matrix and process
+covariance.
+\item[$z_t,\,\eta_t$] Scalar magnetometer measurement and its noise, variance $R$.
+\item[$h(\cdot)$] Anomaly-map interpolation (with IGRF core) as a function of
+position.
+\item[$\mathbf{g}_t$] Map gradient $\partial h/\partial\mathbf{p}$ at epoch $t$.
+\item[$\mathbf{A}_t$] Tolles--Lawson basis row from the three-axis fluxgate.
+\item[$c_t$] Aircraft magnetic interference, $c_t=\mathbf{A}_t^{\top}\boldsymbol{\beta}_t$.
+\item[$L_w,\,L_o$] Sliding-window length and overlap (look-ahead).
+\item[$\rho,\,\delta$] Robust kernel and its Huber threshold.
+\item[$\mathbf{G},\boldsymbol{\Psi}$] Stacked map-gradient and TL-regressor matrices
+over a window.
+\end{IEEEdescription}
 
 \section{Introduction}
 
@@ -302,12 +324,41 @@ J(\boldsymbol{\chi})=\;&\lVert\mathbf{x}_1-\mathbf{x}_0\rVert^2_{\mathbf{P}_0^{-
 \end{equation}
 with measurement residual $r_t(\boldsymbol{\chi}_t)=z_t-h(\mathbf{p}_t)-
 \mathbf{A}_t^{\top}\boldsymbol{\beta}_t-S_t$ and $\rho$ a possibly robust kernel.
-For $\rho(u)=\tfrac12 u^2$ and fixed $\boldsymbol{\beta}$ the linear--Gaussian chain
-makes the minimizer of~\eqref{eq:cost} identical to the Rauch--Tung--Striebel (RTS)
-smoother~\cite{rauch1965}; the value of the formulation is therefore not smoothing
-per se but the joint estimation of the time-varying $\boldsymbol{\beta}$ together
-with navigation, and the ability to add the non-Gaussian and sensor-error terms
-introduced next.
+We make the standard modeling assumptions of aided inertial
+navigation~\cite{groves2013,barshalom2001}.
+\begin{assumption}\label{as:model}
+The process and measurement noises $\mathbf{w}_t,\mathbf{w}^{\beta}_t,\eta_t$ are
+zero-mean, white, mutually independent, and Gaussian; the linearizations
+\eqref{eq:dyn} and \eqref{eq:measlin} are valid over a window; and the prior
+$(\hat{\boldsymbol{\chi}}_0,\mathbf{P}_0)$ is Gaussian.
+\end{assumption}
+Assumption~\ref{as:model} is the same one under which the EKF and RTS smoother are
+derived, so any performance difference between the estimators reflects their
+\emph{structure}, not their noise models. Under it the batch estimate coincides with
+the classical smoother.
+
+\begin{lemma}\label{lem:rts}
+Under Assumption~\ref{as:model}, with $\rho(u)=\tfrac12u^2$ and $\boldsymbol{\beta}$
+held fixed, the minimizer of~\eqref{eq:cost} equals the Rauch--Tung--Striebel (RTS)
+smoother estimate over the window.
+\end{lemma}
+\begin{IEEEproof}
+With $\rho$ quadratic and $\boldsymbol{\beta}$ fixed, \eqref{eq:cost} is a positive-%
+definite quadratic in the Gaussian chain $\{\mathbf{x}_t\}$, so its minimizer is the
+posterior mean $\mathbb{E}[\mathbf{x}_{1:N}\mid z_{1:N}]$. For a linear--Gaussian
+state-space model that conditional mean is exactly what the forward Kalman recursion
+followed by the backward RTS recursion computes~\cite{rauch1965}; the two therefore
+coincide. \end{IEEEproof}
+
+\begin{remark}
+Lemma~\ref{lem:rts} is why we do not claim smoothing itself as a contribution: for
+a static, known compensation the batch graph and a filter--smoother pass are
+equivalent. The contribution is what the graph makes easy that a filter does
+not---jointly estimating the \emph{time-varying} $\boldsymbol{\beta}$, adding the
+non-Gaussian robust kernel of~\eqref{eq:huber}, and appending the sensor-error
+variables of Section~\ref{sec:method}---together with the fixed-lag windowing that
+keeps it causal-latency bounded.
+\end{remark}
 
 \section{Method}\label{sec:method}
 The proposed estimator (Fig.~\ref{fig:pipeline}) represents navigation, online
@@ -660,6 +711,19 @@ because its per-window relinearization lets later-observable calibration protect
 earlier navigation. The lone exception is a \SI{14}{\minute} line on which every
 method is weak, reflecting a map-information floor for short lines.
 
+Reading the table by case sharpens the picture. On the three lines where the causal
+EKF diverges (1003.02, 1003.08, and 1007.02 on Mag~4), the divergence is to
+$1.7$--$42\times10^{3}$\,m---the filter has committed to a wrong position from which
+the later, correct calibration cannot recover it---whereas the window smoother stays
+at \SIrange{26}{43}{\meter}. On the well-conditioned Mag~5 sensor both estimators are
+stable and the window still wins on four of five lines, by \SIrange{3}{17}{\meter},
+the residual benefit of the look-ahead. The single case the EKF wins (1006.08 Mag~5,
+$117.5$ vs \SI{122.0}{\meter}) is the short line where neither method does well and
+the difference is within run-to-run variability. Averaging the bounded cases, the
+window reduces DRMS by \SI{28}{\percent} relative to the causal EKF while removing
+the divergence mode entirely---the two effects the fixed-lag formulation was designed
+to provide.
+
 \begin{table}[t]
 \caption{Breadth: cold-start cabin magnetometers, DRMS [m]; causal online-TL EKF
 vs.\ \SI{5}{\minute}-window smoother (Huber). ``div.''\ denotes divergence
@@ -761,6 +825,28 @@ both sides of each committed state before that state is fixed; later-observable
 calibration then protects earlier navigation. This is the same structural reason
 that batch and incremental smoothers outperform filtering in visual--inertial
 estimation~\cite{forster2017,qin2018}, here applied to the compensation problem.
+Table~\ref{tab:compare} positions the estimator families along the axes that matter
+for cold-start compensation.
+
+\begin{table}[t]
+\caption{Estimator families for cold-start map-matching compensation.
+\ding{51}\,= yes, \ding{55}\,= no, ($\sim$)\,= limited.}
+\label{tab:compare}
+\centering
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{lcccc}
+\toprule
+ & Future & Comp. & Non- & Bounded \\
+Estimator & data & state & Gauss. & latency \\
+\midrule
+Causal EKF~\cite{canciani2017} & \ding{55} & ($\sim$) & \ding{55} & \ding{51} \\
+Particle / grid filter~\cite{nordlund2009} & \ding{55} & \ding{55} & \ding{51} & \ding{51} \\
+Online EKF+TL+NN~\cite{hager2026} & \ding{55} & \ding{51} & ($\sim$) & \ding{51} \\
+Batch FGO & \ding{51} & \ding{51} & \ding{51} & \ding{55} \\
+\textbf{Proposed (fixed-lag FGO)} & \ding{51} & \ding{51} & \ding{51} & \ding{51} \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{The role of observability}
 Proposition~\ref{prop:obs} delimits when the joint problem is well-posed at all: the
@@ -797,6 +883,54 @@ beats a reproduced online EKF+TL+NN on the primary line and generalizes across
 five lines, three flights, and two maps, remaining bounded where the causal EKF
 diverges. An exact observability condition and its exogeneity corollary explain
 the behavior and guide the choice of compensation features.
+
+\appendices
+\section{Pinson Error-State Dynamics}\label{app:pinson}
+The navigation-error block of $\boldsymbol{\Phi}_t$ in~\eqref{eq:dyn} follows the
+Pinson model in a local north-east-down frame~\cite{titterton2004,groves2013}. With
+position, velocity, and attitude errors $(\delta\mathbf{p},\delta\mathbf{v},
+\boldsymbol{\psi})$ and sensor biases $(\mathbf{b}_a,\mathbf{b}_g)$, the continuous
+error dynamics are
+\begin{equation}
+\begin{aligned}
+\dot{\delta\mathbf{p}}&=\mathbf{F}_{pp}\,\delta\mathbf{p}+\delta\mathbf{v},\\
+\dot{\delta\mathbf{v}}&=\mathbf{F}_{vp}\,\delta\mathbf{p}
++\mathbf{F}_{vv}\,\delta\mathbf{v}
+-[\mathbf{f}^n\times]\,\boldsymbol{\psi}+\mathbf{C}^n_b\mathbf{b}_a,\\
+\dot{\boldsymbol{\psi}}&=\mathbf{F}_{\psi p}\,\delta\mathbf{p}
++\mathbf{F}_{\psi v}\,\delta\mathbf{v}
+-[\boldsymbol{\omega}^n_{in}\times]\,\boldsymbol{\psi}-\mathbf{C}^n_b\mathbf{b}_g,
+\end{aligned}
+\label{eq:pinson}
+\end{equation}
+where $\mathbf{f}^n$ is the specific force, $\mathbf{C}^n_b$ the body-to-nav rotation,
+$\boldsymbol{\omega}^n_{in}$ the inertial rate, $[\cdot\times]$ the skew operator, and
+the $\mathbf{F}_{\bullet\bullet}$ blocks collect the transport-rate, gravity-gradient,
+and Coriolis terms. The biases follow first-order Gauss--Markov or random-walk models,
+as does the scalar magnetic disturbance state $S$ with correlation time $\tau$. The
+discrete $\boldsymbol{\Phi}_t=\exp(\mathbf{F}_t\,\Delta t)$ and $\mathbf{Q}_t$ are
+obtained by standard van~Loan discretization~\cite{farrell2008}. Only
+$\mathbf{g}_t^{\top}$, the position row of the measurement Jacobian~\eqref{eq:jac},
+couples this block to the map.
+
+\section{Tolles--Lawson Basis}\label{app:tl}
+The basis row $\mathbf{A}_t$ of~\eqref{eq:tlbasis} is built from the fluxgate
+direction cosines $\hat{\mathbf{b}}=[\,u\;v\;w\,]^{\top}$ (with $u^2+v^2+w^2=1$) and
+the scalar field magnitude $B$~\cite{tolles1950,leliak1961}. The permanent moment
+contributes the three cosines $(u,v,w)$; the induced magnetization, symmetric in the
+field, contributes the six products
+$B\,(u^2,uv,uw,v^2,vw,w^2)$; and the eddy-current field, proportional to the rate of
+change of the cosines, contributes the nine products $B\,(u\dot u,u\dot v,\dots,
+w\dot w)$. Stacking these gives an eighteen-term basis, optionally augmented by a
+constant bias, and $c_t=\mathbf{A}_t^{\top}\boldsymbol{\beta}_t$ is linear in the
+coefficients $\boldsymbol{\beta}_t$---the property that lets them enter the factor
+graph as ordinary linear-measurement variables. In the cold-start regime the
+calibration flight that classically fixes $\boldsymbol{\beta}$ is unavailable, which
+is precisely why we carry it as a graph variable.
+
+\section*{Acknowledgment}
+The experiments use the publicly released SGL~2020 challenge
+dataset~\cite{gnadt2020}.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}
