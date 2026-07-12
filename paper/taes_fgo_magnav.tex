@@ -95,7 +95,15 @@ operations. This has renewed interest in passive, self-contained references that
 draw on natural geophysical signatures of the Earth. Among these, the crustal
 magnetic-anomaly field is attractive: it is globally available, temporally stable
 over the mission horizon, difficult to deny or spoof, and observable with a
-lightweight scalar magnetometer~\cite{canciani2016,canciani2017}.
+lightweight scalar magnetometer~\cite{canciani2016,canciani2017}. The same idea
+underlies terrain-referenced and gravity-referenced navigation, where an onboard
+measurement is matched against a stored geophysical map to bound inertial
+drift~\cite{golden1980,hostetler1983,nordlund2009}; magnetic-anomaly navigation is
+distinguished by the ubiquity and fine spatial structure of the crustal field and by
+the maturity of airborne magnetic surveying. These properties make it a candidate
+absolute reference for long-endurance aircraft, uncrewed platforms, and
+munitions operating where GNSS cannot be trusted, provided the aircraft's own
+magnetic signature can be removed in flight.
 
 % P2: Scope Narrowing
 Magnetic-anomaly navigation (MagNav) estimates aircraft position by matching the
@@ -283,7 +291,14 @@ z_t \approx h(\bar{\mathbf{p}}_t)+\mathbf{g}_t^{\top}\delta\mathbf{p}_t+c_t+\eta
 so the map gradient $\mathbf{g}_t$ is the \emph{sole} source of horizontal position
 information: where $\mathbf{g}_t\!\approx\!\mathbf{0}$ (a locally flat map) position
 is momentarily unobservable, and everywhere the interference $c_t$ competes with the
-$\mathbf{g}_t^{\top}\delta\mathbf{p}_t$ term for the same measurement.
+$\mathbf{g}_t^{\top}\delta\mathbf{p}_t$ term for the same measurement. The map $h$ is
+stored as a gridded anomaly product upward-continued to the survey altitude; we
+evaluate it and its gradient by bicubic interpolation, which yields the continuous
+$\mathbf{g}_t$ required to linearize~\eqref{eq:measlin}, and we restore the IGRF core
+field so that $z_t$ and $h$ are on a common absolute scale. The gradient magnitude
+$\lVert\mathbf{g}_t\rVert$ varies by more than an order of magnitude along a line,
+which is why position accuracy is not uniform in time even for a perfect
+compensator---a point the error traces of Section~\ref{sec:results} make visible.
 
 \subsection{Tolles--Lawson interference model}
 Classical aeromagnetic compensation writes the interference as a linear combination
@@ -605,8 +620,22 @@ Corollary~\ref{cor:exo}.
 \emph{(iii) De-trusting the map through the transient.} During the cold-start
 transient the compensation is grossly wrong, so the map residual is unreliable; we
 inflate the measurement variance and the coefficient process noise for the warm-up,
-then relax them. With these three fixes the filter lands inside the band published
-for it~\cite{hager2026} (Table~\ref{tab:1007}) and serves as our baseline.
+then relax them.
+
+Concretely, the reproduced filter augments the navigation state with the permanent
+TL group and a single-hidden-layer network of eight units acting on that group,
+giving \num{41} network-weight states carried in the EKF; the FOGM disturbance state
+uses a $(\sigma,\tau)$ of $(\SI{3}{\nano\tesla},\SI{180}{\second})$ and the measurement
+variance is $12^2\,\mathrm{nT}^2$ after warm-up. The DC-removal step measures an
+interference offset of, e.g., $-1724\,\mathrm{nT}$ on Mag~4 and $+310\,\mathrm{nT}$
+on Mag~5, which if left in the target is what drove the untreated filter to
+divergence. With these three fixes the filter reaches
+\num{40.0}/\SI{17.5}{\meter} on Mag~4/5, inside the band published for
+it~\cite{hager2026} (Table~\ref{tab:1007}), and its late-half residual falls to
+\SIrange{117}{231}{\nano\tesla}; we take this as a faithful reproduction and use it
+as the baseline. We stress that the network only \emph{compensates}; the fixes are
+what make it observable jointly with position, which is the same requirement
+Corollary~\ref{cor:exo} places on our own compensation features.
 
 \section{Experiments and Results}\label{sec:results}
 
@@ -724,6 +753,7 @@ INS \SI{318}{\meter}; EKF on compensated Mag~1 $\approx\SI{20}{\meter}$.}
 Method (no NN unless noted) & Mag 4 & Mag 5 \\
 \midrule
 FGO-online, static batch TL & 123.7 & 68.1 \\
+FGO-online, window \SI{2}{\minute} & 45.9 & 17.1 \\
 FGO-online, window \SI{5}{\minute} & 37.0 & 15.1 \\
 \textbf{FGO-online, window \SI{5}{\minute} + Huber} & \textbf{32.6} & \textbf{14.2} \\
 \midrule
