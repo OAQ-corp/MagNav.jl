@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Factor-Graph Aeromagnetic Compensation for Airborne Magnetic-Anomaly Navigation</title>
+<style>
+@page { size: Letter; margin: 0.7in 0.62in; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: "Times New Roman", Times, serif; font-size: 9.4pt; line-height: 1.28;
+       color: #000; margin: 0; }
+.title { text-align: center; font-size: 19pt; font-weight: 700; line-height: 1.15;
+         margin: 0 0 6pt; }
+.authors { text-align: center; font-size: 10.5pt; margin: 0 0 2pt; }
+.affil { text-align: center; font-size: 8.2pt; color: #000; margin: 0 0 12pt; }
+.abstract { font-weight: 700; font-size: 8.8pt; text-align: justify; }
+.abstract .lead { font-style: italic; }
+.keywords { font-weight: 700; font-size: 8.8pt; text-align: justify; margin-top: 6pt; }
+.rule { border: none; border-top: 1px solid #000; margin: 10pt 0; }
+.cols { column-count: 2; column-gap: 0.28in; text-align: justify; }
+h2 { font-size: 9.6pt; font-variant: small-caps; text-align: center; font-weight: 700;
+     margin: 11pt 0 4pt; letter-spacing: 0.3px; }
+h2 .num { font-variant: normal; }
+h3 { font-size: 9.4pt; font-style: italic; font-weight: 400; margin: 8pt 0 2pt; }
+p { margin: 0 0 5pt; text-indent: 12pt; }
+p.noindent, .abstract, .keywords { text-indent: 0; }
+.eq { text-align: center; margin: 6pt 0; font-style: italic; break-inside: avoid; }
+.eq .tag { float: right; font-style: normal; }
+i, em { font-style: italic; }
+.prop { break-inside: avoid; margin: 5pt 0; }
+.prop .lab { font-style: italic; font-weight: 700; }
+.proof { break-inside: avoid; margin: 3pt 0 6pt; }
+.proof .lab { font-style: italic; }
+.qed { float: right; }
+table { border-collapse: collapse; font-size: 8.4pt; margin: 2pt auto 4pt; width: 100%; }
+.tabwrap { break-inside: avoid; margin: 6pt 0; }
+.caption { font-size: 8pt; text-align: justify; margin: 0 0 3pt; }
+.caption b { font-variant: small-caps; }
+th, td { padding: 1.5px 5px; text-align: right; }
+th:first-child, td:first-child, .lft { text-align: left; }
+thead th { border-top: 1.2px solid #000; border-bottom: 0.6px solid #000; }
+tbody tr:last-child td { border-bottom: 1.2px solid #000; }
+.midrule td { border-top: 0.6px solid #000; }
+.refs { column-count: 2; column-gap: 0.28in; font-size: 8pt; text-align: justify; }
+.refs ol { margin: 0; padding-left: 14pt; }
+.refs li { margin-bottom: 2pt; }
+sub, sup { font-size: 75%; }
+.small { font-size: 8pt; }
+</style>
+</head>
+<body>
+
+<div class="title">Factor-Graph Aeromagnetic Compensation for Airborne Magnetic-Anomaly Navigation</div>
+<div class="authors">Anonymous</div>
+<div class="affil">Manuscript draft. Reproducible code and experiments: MagNav.jl research branch <tt>claude/fgo-problem-research-bllgbr</tt>.</div>
+
+<div class="abstract"><span class="lead">Abstract&mdash;</span>
+Airborne magnetic-anomaly navigation bounds inertial drift in GNSS-denied flight by
+matching a scalar magnetometer against a magnetic-anomaly map. Its central obstacle is
+aeromagnetic interference: the aircraft&rsquo;s own field must be compensated online when no
+calibration flight is available (the cold-start regime). A recent approach augments an
+extended Kalman filter (EKF) with online Tolles&ndash;Lawson (TL) coefficients and a residual
+neural network. We show that a factor-graph formulation reaches the same accuracy without a
+neural network by carrying the TL coefficients as graph variables of a fixed-lag
+sliding-window smoother, so the compensation adapts along the flight. On the primary
+evaluation line of the SGL&nbsp;2020 dataset the sliding-window smoother matches or beats a
+reproduced online EKF+TL+NN and the values published for it. Across five long survey lines
+from three flights and two maps, it improves on a causal online-TL EKF on 8 of 9 cold-start
+cases and, importantly, remains bounded where the causal filter diverges. We also give an
+exact linear condition for the joint observability of compensation and navigation, from
+which an exogeneity design rule for the compensation features follows.
+</div>
+
+<div class="keywords"><i>Index Terms&mdash;</i>
+Magnetic-anomaly navigation, aeromagnetic compensation, Tolles&ndash;Lawson, factor-graph
+optimization, fixed-lag smoothing, GNSS-denied navigation.
+</div>
+
+<hr class="rule">
+
+<div class="cols">
+
+<h2><span class="num">I.</span>&nbsp;&nbsp;Introduction</h2>
+<p class="noindent">M<span class="small">AGNETIC</span>-anomaly navigation estimates aircraft
+position by matching a measured scalar magnetic field against a surveyed crustal-anomaly map,
+providing an absolute position reference that bounds inertial drift when GNSS is denied&nbsp;[1],&nbsp;[2].
+The public benchmark for the problem is the Signal Enhancement for Magnetic Navigation
+(SGL&nbsp;2020) dataset&nbsp;[3].</p>
+
+<p>The dominant error source is the aircraft, not the map: permanent and induced magnetization
+and eddy-current fields perturb the scalar measurement by hundreds of nanotesla, dwarfing the
+anomaly signal. Classical aeromagnetic compensation uses the Tolles&ndash;Lawson (TL) model&nbsp;[4],
+a linear regression of the interference onto attitude-dependent terms built from a three-axis
+fluxgate, with coefficients fit on a dedicated calibration flight. When no calibration flight
+is available&mdash;the operationally important cold-start regime&mdash;the coefficients must be
+learned online, jointly with navigation. A state-of-the-art approach augments an EKF with
+online TL coefficients and a residual neural network (NN), the latter learned online and
+stabilized by a dedicated training design&nbsp;[5].</p>
+
+<p>We ask whether the neural network is necessary, and show it is not. We treat the TL
+coefficients as time-varying variables of a factor graph and solve the joint estimation as a
+fixed-lag sliding-window smoother; the per-window relinearization supplies the time-varying
+compensation that the competing method obtains from an online network.</p>
+
+<p>We are explicit about scope. For the linear&ndash;Gaussian INS error model the batch
+maximum-a-posteriori (MAP) estimate on the factor-graph chain equals the
+Rauch&ndash;Tung&ndash;Striebel (RTS) smoother&nbsp;[6]; smoothing alone is not our subject. The
+contributions are: an online-TL compensation cast as a fixed-lag factor-graph smoother, an
+NN-free alternative to online EKF+TL+NN (Section&nbsp;III); a reproduced&mdash;not merely
+cited&mdash;EKF+TL+NN baseline and a five-line breadth study on real data (Section&nbsp;VI); and
+an exact observability condition for joint compensation and navigation with an exogeneity
+corollary (Section&nbsp;IV).</p>
+
+<h2><span class="num">II.</span>&nbsp;&nbsp;Problem Formulation</h2>
+<h3>A. INS error state and measurement</h3>
+<p>We use the Pinson INS error model augmented with a first-order Gauss&ndash;Markov (FOGM)
+catch-all magnetic state, error state <i>x</i>&nbsp;&isin;&nbsp;&#8477;<sup><i>n</i></sup>, and
+linearized dynamics <i>x</i><sub><i>t</i>+1</sub>&nbsp;=&nbsp;&Phi;<sub><i>t</i></sub><i>x</i><sub><i>t</i></sub>&nbsp;+&nbsp;<i>w</i><sub><i>t</i></sub>,
+<i>w</i><sub><i>t</i></sub>&nbsp;&sim;&nbsp;&#119977;(0,&nbsp;<i>Q</i><sub><i>t</i></sub>). The scalar
+magnetometer measurement is</p>
+<div class="eq"><span class="tag">(1)</span>
+<i>z</i><sub><i>t</i></sub> = <i>h</i>(<i>p</i><sub><i>t</i></sub>) + <i>c</i><sub><i>t</i></sub> + <i>&eta;</i><sub><i>t</i></sub>,&nbsp;&nbsp;&nbsp;<i>&eta;</i><sub><i>t</i></sub> &sim; &#119977;(0, <i>R</i>),
+</div>
+<p class="noindent">where <i>h</i> interpolates the anomaly map (with IGRF core) at position
+<i>p</i><sub><i>t</i></sub> and <i>c</i><sub><i>t</i></sub> is the aircraft interference. A
+position error <i>&delta;p</i> perturbs the prediction by
+&nabla;<i>h</i>&middot;<i>&delta;p</i>; this gradient is the sole source of horizontal position
+information.</p>
+
+<h3>B. Tolles&ndash;Lawson compensation</h3>
+<p>The interference is modeled as
+<i>c</i><sub><i>t</i></sub> = <i>A</i><sub><i>t</i></sub><sup>&#8868;</sup><i>&beta;</i><sub><i>t</i></sub>,
+where <i>A</i><sub><i>t</i></sub> is the TL basis row (permanent, induced, and eddy-current
+terms, and an optional bias) formed from the fluxgate at time <i>t</i>&nbsp;[4] and
+<i>&beta;</i><sub><i>t</i></sub> are the coefficients. Cold-start operation makes <i>&beta;</i> a
+slowly time-varying state.</p>
+
+<h3>C. Batch MAP estimate</h3>
+<p>Over a window of <i>N</i> epochs the MAP estimate minimizes</p>
+<div class="eq"><span class="tag">(2)</span>
+<i>J</i> = &#8214;<i>x</i><sub>1</sub>&minus;<i>x</i><sub>0</sub>&#8214;<sup>2</sup><sub><i>P</i><sub>0</sub><sup>&minus;1</sup></sub>
++ &sum;<sub><i>t</i></sub> &#8214;<i>x</i><sub><i>t</i>+1</sub>&minus;&Phi;<sub><i>t</i></sub><i>x</i><sub><i>t</i></sub>&#8214;<sup>2</sup><sub><i>Q</i><sub><i>t</i></sub><sup>&minus;1</sup></sub>
++ &sum;<sub><i>t</i></sub> <i>&rho;</i>((<i>z</i><sub><i>t</i></sub>&minus;<i>h</i><sub><i>t</i></sub>)/&radic;<i>R</i>),
+</div>
+<p class="noindent">with <i>&rho;</i> a possibly robust kernel. For <i>&rho;</i>(<i>u</i>)=<i>u</i><sup>2</sup>
+and the linear&ndash;Gaussian chain the minimizer of&nbsp;(2) equals the RTS smoother&nbsp;[6]; we
+solve it by an iterated RTS pass or, equivalently, by a sparse Gauss&ndash;Newton/QR (square-root
+SAM) step&nbsp;[7], with iteratively reweighted least squares for robust <i>&rho;</i>.</p>
+
+<h2><span class="num">III.</span>&nbsp;&nbsp;Method</h2>
+<h3>A. Online TL coefficients as graph variables</h3>
+<p>We append <i>&beta;</i> to the error state, so the measurement factor becomes
+<i>z</i><sub><i>t</i></sub> = <i>A</i><sub><i>t</i></sub><sup>&#8868;</sup><i>&beta;</i><sub><i>t</i></sub> + <i>h</i>(<i>p</i><sub><i>t</i></sub>) + <i>S</i><sub><i>t</i></sub> + <i>&eta;</i><sub><i>t</i></sub>
+with <i>S</i><sub><i>t</i></sub> the FOGM state, and the measurement Jacobian row is
+<i>H</i><sub><i>t</i></sub> = [<i>g</i><sub><i>t</i></sub><sup>&#8868;</sup>&nbsp; 0 &nbsp;<i>A</i><sub><i>t</i></sub><sup>&#8868;</sup>&nbsp; 1],
+<i>g</i><sub><i>t</i></sub> = &part;<i>h</i>/&part;<i>p</i>. Because the batch solution uses the
+entire window, early navigation states benefit from calibration information that only becomes
+observable after later maneuvers&mdash;a property a causal filter lacks.</p>
+
+<h3>B. Fixed-lag sliding window</h3>
+<p>A single batch over a long line forces one static <i>&beta;</i>, which underfits time-varying
+interference. We instead process the flight in overlapping windows of length <i>L</i><sub><i>w</i></sub>
+with overlap <i>L</i><sub><i>o</i></sub>, each a batch factor graph, in the manner of incremental
+smoothing&nbsp;[8]. A window commits only its leading stride <i>L</i><sub><i>w</i></sub>&minus;<i>L</i><sub><i>o</i></sub>
+epochs and carries the full smoothed state and covariance forward as the prior for the next
+window; the trailing overlap serves as smoother look-ahead. The compensation thus adapts along
+the flight while navigation stays continuous across windows.</p>
+
+<h3>C. Physical sensor-error factors</h3>
+<p>Beyond TL we cast physically-motivated scalar-magnetometer error terms as graph variables:
+an optically-pumped-magnetometer heading error as a Fourier series in the sensor&ndash;field angle
+<i>&theta;</i>, a fluxgate hard-iron bias, a linear drift, and a dead-zone heteroscedastic
+measurement weight. A position-only grid or point-mass estimator cannot carry such sensor-error
+states; the graph formulation can.</p>
+
+<h2><span class="num">IV.</span>&nbsp;&nbsp;Observability of Joint Compensation and Navigation</h2>
+<p class="noindent">Whether position can be recovered while the compensation is estimated jointly
+is a property of the measurement geometry. Over a window let <i>G</i> have rows
+<i>g</i><sub><i>t</i></sub><sup>&#8868;</sup> (the map-gradient/position sensitivity) and let
+<i>&Psi;</i> have rows <i>A</i><sub><i>t</i></sub><sup>&#8868;</sup> (the TL regressor). Restricting
+(1) to the (<i>&delta;p</i>,&nbsp;<i>&delta;&beta;</i>) subspace gives the window model
+<i>z</i> = <i>G&nbsp;&delta;p</i> + <i>&Psi;&nbsp;&delta;&beta;</i> + <i>&eta;</i>.</p>
+
+<div class="prop"><span class="lab">Proposition 1.</span> <i>A position perturbation
+<span style="font-style:normal">&delta;p</span> is indistinguishable from a compensation
+adjustment&mdash;hence unobservable from map matching over the window&mdash;if and only if
+G&nbsp;&delta;p&nbsp;&isin;&nbsp;range(&Psi;). Consequently the joint state
+(&delta;p,&nbsp;&delta;&beta;) is observable if and only if
+range(G)&nbsp;&cap;&nbsp;range(&Psi;)&nbsp;=&nbsp;{0}.</i></div>
+
+<div class="proof"><span class="lab">Proof.</span> Two joint states (<i>&delta;p</i>,&nbsp;<i>&delta;&beta;</i>)
+and (<i>&delta;p&prime;</i>,&nbsp;<i>&delta;&beta;&prime;</i>) produce identical noise-free
+predictions iff <i>G</i>(<i>&delta;p</i>&minus;<i>&delta;p&prime;</i>) = <i>&Psi;</i>(<i>&delta;&beta;&prime;</i>&minus;<i>&delta;&beta;</i>),
+i.e. iff <i>G</i>(<i>&delta;p</i>&minus;<i>&delta;p&prime;</i>)&nbsp;&isin;&nbsp;range(<i>&Psi;</i>).
+A nonzero position difference with this property exists iff
+range(<i>G</i>)&nbsp;&cap;&nbsp;range(<i>&Psi;</i>)&nbsp;&ne;&nbsp;{0}, the negation of the stated
+condition; equivalently the stacked Jacobian [<i>G</i>&nbsp;&Psi;] is column-rank-deficient.
+<span class="qed">&#9633;</span></div>
+
+<div class="prop"><span class="lab">Corollary 1 (Exogeneity).</span> <i>If
+<span style="font-style:normal">A<sub>t</sub></span> is a function of aircraft attitude/fluxgate
+alone&mdash;exogenous to position&mdash;then range(&Psi;) is generically transverse to the
+map-gradient subspace range(G) and the joint problem is observable at any basis dimension. If
+instead a compensation feature contains the map value h(p) (for example the scalar magnetometer
+itself), its column aligns with range(G), forcing the intersection nonzero and collapsing
+observability.</i></div>
+
+<p>Proposition&nbsp;1 is exact but non-constructive: it does not yield a reliable scalar screening
+statistic, and in our experiments correlation-based proxies for the intersection did not
+generalize across estimators. The actionable consequence is Corollary&nbsp;1: drive the
+compensation from exogenous features, which every estimator in Section&nbsp;VI does.</p>
+
+<h2><span class="num">V.</span>&nbsp;&nbsp;Reproduced Online EKF+TL+NN Baseline</h2>
+<p class="noindent">To compare against&nbsp;[5] on equal footing we re-run, rather than cite, an
+online EKF with TL basis features and NN weights carried as EKF states and learned online.
+Reproducing the cold start required three fixes, each addressing a distinct failure:
+initializing the NN output bias to the onboard-estimated interference offset; restricting the
+NN inputs to the attitude-derived TL basis and excluding the scalar magnetometer (consistent
+with Corollary&nbsp;1); and de-trusting the map through the cold-start transient. The resulting
+filter lands inside the paper&rsquo;s published band and serves as our baseline.</p>
+
+<h2><span class="num">VI.</span>&nbsp;&nbsp;Experiments and Results</h2>
+<p class="noindent">All experiments use the public SGL&nbsp;2020 dataset&nbsp;[3] and the Ottawa
+anomaly maps, and are produced by continuous-integration scripts on the code branch. The metric
+is horizontal distance-RMS (DRMS) after a 10-min warm-up. Cold start means TL coefficients
+initialized to zero with no calibration flight; the EKF and factor-graph comparisons use
+identical noise settings so that only the estimator structure differs.</p>
+
+<h3>A. Batch estimator on real data</h3>
+<p>On line 1003.02 (Flt1003, 63&nbsp;min) with the compensated stinger magnetometer, the batch
+factor graph improves horizontal DRMS from the EKF&rsquo;s 28.3&nbsp;m to 14.0&nbsp;m (Huber
+kernel), against 114.6&nbsp;m free-inertial. On a 10-min segment the iterated-RTS and
+sparse-GN/QR solvers agree to within 1&nbsp;m, confirming both reach the same MAP estimate.</p>
+
+<h3>B. Cold-start line vs. online EKF+TL+NN</h3>
+<p>Table&nbsp;I reports the primary evaluation line 1007.06 (87&nbsp;min, full length), on the two
+uncompensated cabin magnetometers. A static-TL batch underfits and degrades over the long line.
+The fixed-lag window recovers it, and with a Huber kernel reaches 32.6&nbsp;/&nbsp;14.2&nbsp;m.
+The reproduced online EKF+TL+NN reaches 40.0&nbsp;/&nbsp;17.5&nbsp;m, inside the band published for
+that filter&nbsp;[5]. The window smoother thus matches or beats the NN-augmented filter without a
+neural network.</p>
+
+<div class="tabwrap">
+<div class="caption"><b>Table I</b><br>Cold start, line 1007.06, uncompensated cabin magnetometers; DRMS [m]. INS 318&nbsp;m; EKF on compensated Mag&nbsp;1 &asymp; 20&nbsp;m.</div>
+<table>
+<thead><tr><th class="lft">Method (no NN unless noted)</th><th>Mag 4</th><th>Mag 5</th></tr></thead>
+<tbody>
+<tr><td class="lft">FGO-online, static batch TL</td><td>123.7</td><td>68.1</td></tr>
+<tr><td class="lft">FGO-online, window 5&nbsp;min</td><td>37.0</td><td>15.1</td></tr>
+<tr><td class="lft"><b>FGO-online, window 5&nbsp;min + Huber</b></td><td><b>32.6</b></td><td><b>14.2</b></td></tr>
+<tr class="midrule"><td class="lft">EKF+TL+NN, reproduced [5]</td><td>40.0</td><td>17.5</td></tr>
+<tr><td class="lft">EKF+TL+NN, published [5]</td><td>37</td><td>14</td></tr>
+<tr><td class="lft">EKF+TL-only, published [5]</td><td>58</td><td>15</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>C. Breadth across lines, flights, and maps</h3>
+<p>Table&nbsp;II runs the same cold-start TL model through the causal online-TL EKF and the
+fixed-lag window smoother on five long survey lines spanning three flights and two maps. The
+window smoother is better on 8 of 9 cold-start cases. On the noisy Mag&nbsp;4 the causal EKF
+diverges from the cold start to tens of kilometers on three lines, whereas the window smoother
+stays bounded, because its per-window relinearization lets later-observable calibration protect
+earlier navigation. The lone exception is a 14-min line on which every method is weak, reflecting
+a map-information floor for short lines.</p>
+
+<div class="tabwrap">
+<div class="caption"><b>Table II</b><br>Breadth: cold-start cabin magnetometers, DRMS [m]; causal online-TL EKF vs. 5-min-window smoother (Huber). &ldquo;div.&rdquo; denotes divergence beyond 10&nbsp;km. E&nbsp;=&nbsp;Eastern, R&nbsp;=&nbsp;Renfrew.</div>
+<table>
+<thead><tr><th class="lft">Flight</th><th class="lft">Line</th><th>Map</th><th>Mag</th><th>EKF-online</th><th>FGO-win</th></tr></thead>
+<tbody>
+<tr><td class="lft">Flt1003</td><td class="lft">1003.02</td><td>E</td><td>4</td><td>div.</td><td><b>42.6</b></td></tr>
+<tr><td class="lft">Flt1003</td><td class="lft">1003.02</td><td>E</td><td>5</td><td>28.1</td><td><b>21.7</b></td></tr>
+<tr><td class="lft">Flt1003</td><td class="lft">1003.08</td><td>R</td><td>4</td><td>div.</td><td><b>26.1</b></td></tr>
+<tr><td class="lft">Flt1003</td><td class="lft">1003.08</td><td>R</td><td>5</td><td>21.1</td><td><b>12.4</b></td></tr>
+<tr><td class="lft">Flt1006</td><td class="lft">1006.08</td><td>E</td><td>4</td><td>div.</td><td><b>193.9</b></td></tr>
+<tr><td class="lft">Flt1006</td><td class="lft">1006.08</td><td>E</td><td>5</td><td><b>117.5</b></td><td>122.0</td></tr>
+<tr><td class="lft">Flt1007</td><td class="lft">1007.02</td><td>E</td><td>4</td><td>div.</td><td><b>38.6</b></td></tr>
+<tr><td class="lft">Flt1007</td><td class="lft">1007.02</td><td>E</td><td>5</td><td>31.6</td><td><b>14.5</b></td></tr>
+<tr><td class="lft">Flt1007</td><td class="lft">1007.06</td><td>R</td><td>4</td><td>46.7</td><td><b>32.7</b></td></tr>
+<tr><td class="lft">Flt1007</td><td class="lft">1007.06</td><td>R</td><td>5</td><td>17.8</td><td><b>13.8</b></td></tr>
+<tr class="midrule"><td class="lft" colspan="4">FGO better</td><td colspan="2" style="text-align:right"><b>8 / 9</b></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>D. Sensor-error factors (simulation)</h3>
+<p>On a simulated flight with injected heading error, hard-iron bias, drift, and dead-zone noise
+(INS reference 31.1&nbsp;m), cumulatively adding the sensor-error factors reduces DRMS from
+36.6&nbsp;m (no sensor states, worse than INS because unmodeled error corrupts aiding) to
+4.8&nbsp;m. The drift and one bias component are recovered cleanly, while the heading harmonics
+are observability-limited because level flight sweeps the sensor&ndash;field angle by only about
+12&deg;&mdash;an observability property, not an estimator defect.</p>
+
+<h2><span class="num">VII.</span>&nbsp;&nbsp;Discussion</h2>
+<p class="noindent">The advantage is not smoothing per se, which equals RTS in the
+linear&ndash;Gaussian case, but the joint windowed estimation of a time-varying compensation with
+navigation. A causal filter must commit online with no future context; under a large
+uncompensated cold-start residual it attributes the mismatch to position and diverges, as
+Table&nbsp;II shows. The fixed-lag window defers commitment. Proposition&nbsp;1 explains when the
+joint problem is well-posed and Corollary&nbsp;1 gives the practical rule the results obey.
+Limitations include single-run DRMS on five lines (Monte-Carlo statistics and the full line set
+remain), the absence of a like-for-like grid/point-mass or particle-filter baseline, and
+simulation-only sensor-error validation. Short lines remain hard for every method.</p>
+
+<h2><span class="num">VIII.</span>&nbsp;&nbsp;Conclusion</h2>
+<p class="noindent">Casting online Tolles&ndash;Lawson aeromagnetic compensation as time-varying
+factor-graph variables in a fixed-lag sliding-window smoother yields a neural-network-free
+cold-start calibrator that, on real SGL&nbsp;2020 data, matches or beats a reproduced online
+EKF+TL+NN on the primary line and generalizes across five lines, three flights, and two maps,
+remaining bounded where the causal EKF diverges. An exact observability condition and its
+exogeneity corollary explain the behavior and guide the choice of compensation features.</p>
+
+</div>
+
+<h2 style="margin-top:12pt">References</h2>
+<div class="refs">
+<ol>
+<li>A. Canciani and J. Raquet, &ldquo;Absolute positioning using the Earth&rsquo;s magnetic anomaly field,&rdquo; <i>NAVIGATION</i>, vol. 63, no. 2, pp. 111&ndash;126, 2016.</li>
+<li>A. Canciani and J. Raquet, &ldquo;Airborne magnetic anomaly navigation,&rdquo; <i>IEEE Trans. Aerosp. Electron. Syst.</i>, vol. 53, no. 1, pp. 67&ndash;80, 2017.</li>
+<li>A. R. Gnadt <i>et al.</i>, &ldquo;Signal enhancement for magnetic navigation challenge problem,&rdquo; arXiv:2007.12158, 2020.</li>
+<li>W. E. Tolles and J. D. Lawson, &ldquo;Magnetic compensation of MH-1A aircraft,&rdquo; Airborne Instruments Lab., Rep. 1, 1950.</li>
+<li>Hager <i>et al.</i>, &ldquo;Airborne magnetic navigation with neural-network-augmented online calibration,&rdquo; arXiv:2603.08265, 2026.</li>
+<li>H. E. Rauch, F. Tung, and C. T. Striebel, &ldquo;Maximum likelihood estimates of linear dynamic systems,&rdquo; <i>AIAA J.</i>, vol. 3, no. 8, pp. 1445&ndash;1450, 1965.</li>
+<li>F. Dellaert and M. Kaess, &ldquo;Factor graphs for robot perception,&rdquo; <i>Found. Trends Robot.</i>, vol. 6, no. 1&ndash;2, pp. 1&ndash;139, 2017.</li>
+<li>M. Kaess <i>et al.</i>, &ldquo;iSAM2: Incremental smoothing and mapping using the Bayes tree,&rdquo; <i>Int. J. Robot. Res.</i>, vol. 31, no. 2, pp. 216&ndash;235, 2012.</li>
+</ol>
+</div>
+
+</body>
+</html>

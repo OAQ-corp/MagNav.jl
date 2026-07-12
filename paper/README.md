@@ -16,17 +16,45 @@ All quantitative claims come from the reproducible experiments on this branch
 | Sensor-error factors (sim) | `research/fgo_sensor_ablation.jl` | 36.6 → 4.8 m (−87%) |
 | Observability discussion | `research/observability*.jl`, `research/OBSERVABILITY.md` | sweet spot; exogeneity rule (honest negatives) |
 
-## Building
+## Files
 
-Requires `IEEEtran.cls` (https://www.michaelshell.org/tex/ieeetran/) and a TeX
-distribution (TeX Live / MiKTeX). Not installed in this environment.
+- `taes_fgo_magnav.tex` — LaTeX source (IEEEtran, `\cite` + `references.bib`),
+  written to the Paper-Orchestra style rules (Abstract ≤2 numbers, ≤4 subsections
+  per section, no self-praise, a Proposition + proof for the observability
+  condition).
+- `references.bib` — bibliography. DOIs are included only where confidently known;
+  the rest are left for manual verification (see citation check below).
+- `taes_fgo_magnav.html` — a self-contained, two-column rendition of the same
+  content (offline; no external assets).
+- `taes_fgo_magnav.pdf` — the compiled draft (3 pp.).
+
+## Building the PDF
+
+**Preferred (LaTeX):** requires `IEEEtran.cls`
+(https://www.michaelshell.org/tex/ieeetran/) and a TeX distribution.
 
 ```
-pdflatex taes_fgo_magnav
-pdflatex taes_fgo_magnav   # second pass for cross-references
+pdflatex taes_fgo_magnav && bibtex taes_fgo_magnav && \
+pdflatex taes_fgo_magnav && pdflatex taes_fgo_magnav
 ```
 
-References are inline `\bibitem`s (no BibTeX pass needed).
+**Offline fallback used here (no TeX installed):** render the HTML with headless
+Chromium.
+
+```
+chrome --headless --no-pdf-header-footer \
+  --print-to-pdf=taes_fgo_magnav.pdf taes_fgo_magnav.html
+```
+
+## Citation integrity (Wave 4, before submission)
+
+```
+python check_citations.py . --no-net     # offline: \cite↔bib matching only
+python check_citations.py .               # + DOI existence via doi.org
+```
+
+Current status: `missing 0, unused 0` (no fatal issues); 8 entries are NO-DOI
+(manual verification needed — DOIs were not fabricated).
 
 ## Status / TODO before submission
 
