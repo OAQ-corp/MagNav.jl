@@ -17,7 +17,7 @@ and reproducible simulations.
 |---|---:|---|
 | `src/fgo.jl` | 514 | `fgo` — batch MAP smoother. Two equivalent solvers: iterated **RTS** (`solver=:rts`) and global **sparse Gauss–Newton / QR** (`solver=:gn`, square-root SAM). Robust Huber/Cauchy IRLS kernels. Reuses the existing Pinson model (`get_Phi`/`get_H`/`get_h`). |
 | `src/fgo_online.jl` | 257 | `fgo_online` — batch FGO with **Tolles-Lawson coefficients as factor-graph variables** (joint aeromagnetic compensation + navigation; the batch analog of `ekf_online`). |
-| `src/fgo_sensor.jl` | 272 | `fgo_sensor` — appends **physically-modeled sensor-error states**: OPM heading error (Fourier series in the sensor–field angle θ: light shift ∝cos θ, nonlinear Zeeman ∝cos 2θ), fluxgate hard-iron bias (`m·û_body`), linear drift, and dead-zone measurement weighting (`R/|sin 2θ|²`). |
+| `src/fgo_sensor.jl` | 272 | `fgo_sensor` — appends **physically-modeled sensor-error states**: OPM heading error (cosine harmonics {1,2,4} in the sensor–field angle ψ; Hager et al. 2026, Wang et al. 2020 GRSL), fluxgate hard-iron bias (`m·û_body`), linear drift, and OPM equatorial dead-zone weighting (`R·max(|cos ψ|,ε)²`). |
 | `src/eval_filt.jl` | +34 | `run_filt` dispatch for `:fgo` and `:fgo_online` with `solver`/`robust`/`n_iter` options. |
 | `src/MagNav.jl` | +5 | include + export `fgo`, `fgo_online`, `fgo_sensor`; add `SparseArrays` dep. |
 | `test/test_fgo.jl` | 254 | structure, accuracy-vs-EKF/INS, GN↔RTS agreement, robust-kernel, `fgo_online`, and `fgo_sensor` tests (registered in `runtests.jl`). |
@@ -111,23 +111,27 @@ and FGO wins only on Mag 4 — short lines carry little map information for eith
 
 ## 3. Sensor-error factor ablation (simulated, Eastern_395, injected truth)
 
-Cumulative factors; INS reference 31.1 m. Injected: heading k1=10/k2=6 nT,
-hard-iron m=[15,−10,6] nT, drift 0.02 nT/s, dead-zone heteroscedastic noise.
+Cumulative factors; INS reference 31.1 m. OPM error model (Hager et al. 2026, Wang
+et al. 2020 GRSL): heading c1=10/c2=6/c4=3 nT cosine harmonics {1,2,4},
+hard-iron m=[15,−10,6] nT, drift 0.02 nT/s, dead-zone noise ∝ 1/max(|cos ψ|,0.1).
 
 | Model | DRMS | notes |
 |---|---:|---|
-| baseline (no sensor states) | 36.6 | worse than INS — unmodeled error corrupts aiding |
-| + heading (θ, n=2) | 19.1 | |
-| + dead-zone weighting | 19.2 | inert here (level flight never enters a dead zone) |
-| + fluxgate bias | 8.4 | |
-| **+ drift (full model)** | **4.8** | −87% vs baseline; below INS |
+| baseline (no sensor states) | 42.9 | worse than INS — unmodeled error corrupts aiding |
+| + heading {1,2,4} | 18.9 | largest single drop |
+| + dead-zone weighting | 15.5 | load-bearing (heteroscedastic OPM dead-zone noise) |
+| + fluxgate bias | 8.1 | |
+| **+ drift (full model)** | **6.2** | −86% vs baseline; below INS |
 
-**Parameter recovery (full model vs truth).** Drift 0.019 vs 0.020 ✓ and bias
-m_y −10.5 vs −10 ✓ recover cleanly; heading k1/k2 and bias m_x/m_z are
-**observability-limited** because the simulated flight sweeps the sensor–field
-angle θ by only 12° (level flight at ~70° inclination). Honest finding: the
-**navigation gain is robust, but clean sensor calibration recovery needs wider
-attitude excitation** — an observability result worth formalizing.
+Huber column: 42.8 / 18.3 / 13.6 / 7.8 / 7.3 (agrees within ~2 m).
+
+**Parameter recovery (full model vs truth).** Drift 0.018 vs 0.020 ✓ recovers
+cleanly; heading c1/c2 (3.8/0.6 vs 10/6) are **observability-limited** because the
+simulated flight sweeps the sensor–field angle ψ by only 12° (level flight at
+~70° inclination). Honest finding: the **navigation gain is robust, but clean
+sensor calibration recovery needs wider attitude excitation** — the gain comes
+from the fitted combination over the observed angle range, not the individual
+coefficients. Model-matched injection (simulation only).
 
 ---
 
