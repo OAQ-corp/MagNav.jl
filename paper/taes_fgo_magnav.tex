@@ -935,9 +935,11 @@ compensated stinger magnetometer, where the interference is already removed and 
 comparison isolates the estimator. The batch factor graph improves horizontal DRMS
 from the EKF's \SI{28.3}{\meter} to \SI{14.0}{\meter} (Huber kernel), against
 \SI{114.6}{\meter} free-inertial---a \SI{51}{\percent} reduction over the EKF.
-Fig.~\ref{fig:map} shows the anomaly map, the flight line, and a mid-flight zoom in
-which the free-inertial track visibly departs from truth while the EKF and FGO
-estimates follow it. Fig.~\ref{fig:poserr} plots the horizontal error over the line:
+Fig.~\ref{fig:map} shows the anomaly map and the flight line, with a zoom on the
+fine anomaly structure the map-matching factor exploits; the estimator comparison
+itself is carried by the error and CDF plots below rather than the map, since a
+metre-level track error is not resolvable at map scale.
+Fig.~\ref{fig:poserr} plots the horizontal error over the line:
 the FGO estimate (blue) stays below the EKF (red) for essentially the entire flight,
 the shaded region marking the improvement. Fig.~\ref{fig:cdf} gives the empirical
 error distribution: the FGO curve reaches its 95th percentile at less than
