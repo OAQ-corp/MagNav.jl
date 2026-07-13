@@ -65,7 +65,7 @@ factor-graph optimization, fixed-lag smoothing, GNSS-denied navigation.
 \addcontentsline{toc}{section}{Nomenclature}
 \begin{IEEEdescription}[\IEEEsetlabelwidth{$\boldsymbol{\Phi}_t,\mathbf{Q}_t$}]
 \item[$\mathbf{x}_t$] INS error state at epoch $t$ (position, velocity, attitude,
-biases, FOGM).
+baro-inertial pair, IMU biases, FOGM), $\mathbf{x}_t\in\mathbb{R}^{18}$.
 \item[$\boldsymbol{\beta}_t$] Online Tolles--Lawson compensation coefficients.
 \item[$\boldsymbol{\chi}_t$] Joint state $(\mathbf{x}_t,\boldsymbol{\beta}_t)$.
 \item[$\boldsymbol{\Phi}_t,\mathbf{Q}_t$] Pinson state-transition matrix and process
@@ -256,14 +256,16 @@ We adopt the standard Pinson error model of a strapdown INS~\cite{titterton2004,
 The error state
 \begin{equation}
 \mathbf{x}=\big[\,\delta\mathbf{p}^{\top}\;\delta\mathbf{v}^{\top}\;
-\boldsymbol{\psi}^{\top}\;\mathbf{b}_a^{\top}\;\mathbf{b}_g^{\top}\;S\,\big]^{\top}
-\in\mathbb{R}^{n}
+\boldsymbol{\psi}^{\top}\;h_a\;\hat{a}\;\mathbf{b}_a^{\top}\;\mathbf{b}_g^{\top}\;S\,\big]^{\top}
+\in\mathbb{R}^{18}
 \label{eq:state}
 \end{equation}
 stacks position error $\delta\mathbf{p}$, velocity error $\delta\mathbf{v}$,
-attitude error $\boldsymbol{\psi}$, accelerometer and gyroscope biases
-$\mathbf{b}_a,\mathbf{b}_g$, and a scalar first-order Gauss--Markov (FOGM) state
-$S$ that absorbs residual magnetic disturbance and map error. The discretized,
+attitude error $\boldsymbol{\psi}$ (three components each), the baro-inertial
+altitude-aiding pair $(h_a,\hat{a})$ that damps the vertically unstable channel,
+accelerometer and gyroscope biases $\mathbf{b}_a,\mathbf{b}_g$, and a scalar
+first-order Gauss--Markov (FOGM) state $S$ that absorbs residual magnetic
+disturbance and map error. The discretized,
 linearized dynamics are
 \begin{equation}
 \mathbf{x}_{t+1}=\boldsymbol{\Phi}_t\mathbf{x}_t+\mathbf{w}_t,\qquad
@@ -392,29 +394,60 @@ r_t(\boldsymbol{\chi}_t)=z_t-h(\mathbf{p}_t)-\mathbf{A}_t^{\top}\boldsymbol{\bet
 with Gaussian information $R^{-1}$, and its Jacobian row is
 \begin{equation}
 \mathbf{H}_t=\Big[\underbrace{\mathbf{g}_t^{\top}}_{\delta\mathbf{p}}\;\;
-\underbrace{\mathbf{0}}_{\delta\mathbf{v},\boldsymbol{\psi},\mathbf{b}}\;\;
+\underbrace{\mathbf{0}}_{\delta\mathbf{v},\boldsymbol{\psi},h_a,\hat{a},\mathbf{b}}\;\;
 \underbrace{\mathbf{A}_t^{\top}}_{\boldsymbol{\beta}}\;\;
 \underbrace{1}_{S}\Big].
 \label{eq:jac}
 \end{equation}
-The coefficient block is shared by every measurement factor in the window
-(Fig.~\ref{fig:graph}), so the compensation is identified from the whole trajectory
-rather than instantaneously. Because the batch solution uses future as well as past
-measurements, early navigation states benefit from calibration information that
-only becomes observable after later maneuvers---the property a causal filter lacks.
-A random-walk factor $\lVert\boldsymbol{\beta}_{t+1}-\boldsymbol{\beta}_t\rVert^2_{(\mathbf{Q}^{\beta})^{-1}}$
-links consecutive coefficient blocks and sets how quickly the compensation may
-adapt; $\mathbf{Q}^{\beta}\!\to\!\mathbf{0}$ recovers a single static
-$\boldsymbol{\beta}$.
+The window posterior over the joint states
+$\boldsymbol{\chi}_t=(\mathbf{x}_t,\boldsymbol{\beta}_t)$ is the product of four
+factor families, drawn explicitly in Fig.~\ref{fig:graph}:
+\begin{enumerate}
+  \item a \emph{joint prior} on $\boldsymbol{\chi}_1$---$\mathbf{P}_0$ at cold
+        start, or the smoothed mean and covariance carried from the previous
+        window (Section~\ref{sec:method}-B);
+  \item \emph{Pinson--FOGM process factors}
+        $\lVert\mathbf{x}_{t+1}-\boldsymbol{\Phi}_t\mathbf{x}_t\rVert^2_{\mathbf{Q}_t^{-1}}$,
+        parameterized by the INS mechanization (specific force $\mathbf{f}^n$,
+        attitude $\mathbf{C}^n_b$) through~\eqref{eq:pinson};
+  \item \emph{compensation random-walk factors}
+        $\lVert\boldsymbol{\beta}_{t+1}-\boldsymbol{\beta}_t\rVert^2_{(\mathbf{Q}^{\beta})^{-1}}$,
+        which set how quickly the compensation may adapt---%
+        $\mathbf{Q}^{\beta}\!\to\!\mathbf{0}$ recovers a single static
+        $\boldsymbol{\beta}$;
+  \item \emph{robust scalar-magnetometer factors} $\rho(r_t/\sqrt{R})$
+        with the residual~\eqref{eq:resid}, each coupling $\delta\mathbf{p}_t$
+        (through the map gradient $\mathbf{g}_t$), the disturbance state $S_t$,
+        and $\boldsymbol{\beta}_t$ (through the fluxgate regressor
+        $\mathbf{A}_t$).
+\end{enumerate}
+The INS mechanization, the fluxgate (through $\mathbf{A}_t$), and the anomaly map
+(through $h$ and $\mathbf{g}_t$) enter as \emph{known factor parameters}, not as
+estimated variables; the optional sensor-error variables $\boldsymbol{\theta}$ of
+Section~\ref{sec:method}-F attach to every measurement factor when enabled.
+Because consecutive coefficient blocks are chained rather than instantaneous,
+the compensation is identified from the whole trajectory, and because the batch
+solution uses future as well as past measurements, early navigation states benefit
+from calibration information that only becomes observable after later
+maneuvers---the property a causal filter lacks.
 
-\begin{figure}[t]
+\begin{figure*}[t]
 \centering
-\includegraphics[width=0.86\columnwidth]{figs/fig_graph.pdf}
-\caption{Factor graph. The Tolles--Lawson coefficient variable $\boldsymbol{\beta}$
-(shared, bottom) enters every measurement factor and is estimated jointly with the
-navigation-error chain $\mathbf{x}_1,\dots,\mathbf{x}_N$.}
+\includegraphics[width=0.96\textwidth]{figs/fig_graph.pdf}
+\caption{Factor graph of one window, with every estimated variable and measurement
+shown. Top: the 18-state INS error chain $\mathbf{x}_t$
+of~\eqref{eq:state}, linked by Pinson--FOGM process factors driven by the INS
+mechanization. Bottom: the time-varying Tolles--Lawson coefficient chain
+$\boldsymbol{\beta}_t$, linked by random-walk factors $\mathbf{Q}^{\beta}$. Each
+scalar-magnetometer factor (blue) applies the robust residual
+of~\eqref{eq:resid}, coupling $\delta\mathbf{p}_t$, $S_t$, and
+$\boldsymbol{\beta}_t$; the joint prior (left) is $\mathbf{P}_0$ at cold start or
+the covariance carried from the previous window. Dashed arrows mark known factor
+parameters (INS mechanization, fluxgate basis $\mathbf{A}_t$, map $h,\nabla h$);
+the dashed node $\boldsymbol{\theta}$ holds the optional sensor-error variables of
+Section~\ref{sec:method}-F.}
 \label{fig:graph}
-\end{figure}
+\end{figure*}
 
 \subsection{Fixed-lag sliding window}
 A single batch over a long line forces one static $\boldsymbol{\beta}$, which
@@ -505,7 +538,9 @@ scaling~\cite{agarwal2013} fit the same graph interface and could replace
 
 \subsection{Sparse solver}
 Each Gauss--Newton iteration solves a sparse linear system whose Jacobian has the
-block-bidiagonal-plus-shared-column structure of Fig.~\ref{fig:graph}. We factor it
+block-bidiagonal structure of the two chains in Fig.~\ref{fig:graph} (in the
+static-$\boldsymbol{\beta}$ limit the coefficient blocks collapse to one shared
+column). We factor it
 by column-pivoted QR on the square-root information matrix (square-root
 SAM~\cite{dellaert2006,dellaert2017}), which is numerically stable and exploits the
 chain sparsity; an iterated RTS pass~\cite{rauch1965} gives the identical estimate
@@ -901,7 +936,7 @@ $+$ hard-iron bias & 8.4 \\
 
 \subsection{Computational considerations}
 Each window is a sparse nonlinear least-squares problem of fixed size
-$O\big(L_w(n+m)\big)$; the block-bidiagonal-plus-shared-column Jacobian
+$O\big(L_w(n+m)\big)$; the block-bidiagonal Jacobian of the two chains
 (Fig.~\ref{fig:graph}) is factored in $O(L_w)$ by the square-root
 solver~\cite{dellaert2006}, and the number of Gauss--Newton iterations is small
 (typically $3$--$5$) because the problem is mildly nonlinear away from observability

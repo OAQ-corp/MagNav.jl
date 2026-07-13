@@ -99,41 +99,96 @@ def fig_coldstart():
 
 
 def fig_factorgraph():
-    """Schematic factor graph: nav-error chain + shared TL variable + factors."""
-    fig, ax = plt.subplots(figsize=(COL_W, 1.95))
-    ax.set_xlim(0, 6.3); ax.set_ylim(0.0, 2.6); ax.axis("off")
-    xs = [1.0, 2.6, 4.2, 5.8]
-    yv = 2.0
+    """Faithful factor graph of one window: INS error chain x_t (18 states),
+    time-varying TL chain beta_t (random walk), joint prior, robust scalar-mag
+    factors, factor parameters (INS mech., fluxgate, map) as dashed inputs,
+    optional sensor-error variables theta. Full two-column width."""
+    fig, ax = plt.subplots(figsize=(7.16, 3.15))
+    ax.set_xlim(0, 15.6); ax.set_ylim(-0.15, 5.6); ax.axis("off")
+    xs = [2.5, 5.3, 8.1, 10.9]          # epoch positions
+    YX, YZ, YB = 4.15, 2.85, 1.55       # x-chain, z-factor, beta-chain rows
+    R = 0.30
 
-    def var(cx, cy, txt, fc, r=0.28):
-        ax.add_patch(Circle((cx, cy), r, fc=fc, ec="k", lw=1.0, zorder=3))
-        ax.text(cx, cy, txt, ha="center", va="center", fontsize=9, zorder=4)
+    def var(cx, cy, txt, fc, r=R, ec="k", ls="-"):
+        ax.add_patch(Circle((cx, cy), r, fc=fc, ec=ec, lw=1.0, ls=ls, zorder=4))
+        ax.text(cx, cy, txt, ha="center", va="center", fontsize=8.5, zorder=5)
 
-    def fac(cx, cy, fc="k"):
-        ax.add_patch(Rectangle((cx-0.07, cy-0.07), 0.14, 0.14, fc=fc,
-                     ec="k", lw=0.6, zorder=3))
+    def fac(cx, cy, fc="k", s=0.13):
+        ax.add_patch(Rectangle((cx-s/2, cy-s/2), s, s, fc=fc, ec="k",
+                     lw=0.6, zorder=4))
 
+    def seg(x1, y1, x2, y2, **kw):
+        ax.plot([x1, x2], [y1, y2], zorder=2,
+                **{**dict(color="k", lw=0.9, ls="-"), **kw})
+
+    # ---- variable chains -------------------------------------------------
     for i, cx in enumerate(xs):
-        var(cx, yv, r"$\mathbf{x}_{%d}$" % (i+1), "#cfe0f3")
+        var(cx, YX, r"$\mathbf{x}_{%d}$" % (i+1), "#cfe0f3")
+        var(cx, YB, r"$\boldsymbol{\beta}_{%d}$" % (i+1), "#f6d99b")
+    ax.text(xs[-1]+1.15, YX, r"$\cdots$", fontsize=12, va="center")
+    ax.text(xs[-1]+1.15, YB, r"$\cdots$", fontsize=12, va="center")
+    seg(xs[-1]+R, YX, xs[-1]+0.9, YX); seg(xs[-1]+R, YB, xs[-1]+0.9, YB)
+
+    # ---- process factors (Pinson-FOGM) and TL random walk ---------------
     for i in range(len(xs)-1):
         fx = (xs[i]+xs[i+1])/2
-        fac(fx, yv)
-        ax.plot([xs[i]+0.28, fx-0.07], [yv, yv], "k-", lw=0.9)
-        ax.plot([fx+0.07, xs[i+1]-0.28], [yv, yv], "k-", lw=0.9)
-    var(3.4, 0.45, r"$\boldsymbol{\beta}$", "#f6d99b", r=0.30)
+        fac(fx, YX); seg(xs[i]+R, YX, xs[i+1]-R, YX)
+        fac(fx, YB); seg(xs[i]+R, YB, xs[i+1]-R, YB)
+    ax.text((xs[0]+xs[1])/2, YX+0.42,
+            r"$\|\mathbf{x}_{t+1}-\boldsymbol{\Phi}_t\mathbf{x}_t\|^2_{\mathbf{Q}_t^{-1}}$",
+            fontsize=7.5, ha="center")
+    ax.text((xs[0]+xs[1])/2, YB-0.48,
+            r"$\|\boldsymbol{\beta}_{t+1}-\boldsymbol{\beta}_t\|^2_{(\mathbf{Q}^{\beta})^{-1}}$",
+            fontsize=7.5, ha="center")
+
+    # ---- joint prior on (x_1, beta_1) ------------------------------------
+    fac(1.15, YZ, fc="0.35", s=0.16)
+    seg(1.15, YZ+0.08, xs[0]-R*0.72, YX-R*0.72)
+    seg(1.15, YZ-0.08, xs[0]-R*0.72, YB+R*0.72)
+    ax.text(0.92, YZ-0.42, "joint prior\n$\\mathbf{P}_0$ / carried\nfrom window $k{-}1$",
+            fontsize=6.6, ha="center", va="top", color="#333")
+
+    # ---- measurement factors ---------------------------------------------
     for cx in xs:
-        fac(cx, 1.15, fc=C_PROPOSED)
-        ax.plot([cx, cx], [yv-0.28, 1.15+0.07], "k-", lw=0.9)
-        ax.plot([cx, 3.4], [1.15-0.07, 0.45+0.30], "-", color="0.35",
-                lw=0.8, alpha=0.9)
-    ax.text(0.05, yv, "nav.\nerror", fontsize=7.5, va="center", ha="left",
-            color="#333")
-    ax.text(0.05, 0.45, "TL\ncoef.", fontsize=7.5, va="center", ha="left",
-            color="#333")
-    ax.add_patch(Rectangle((5.93, 1.08), 0.14, 0.14, fc=C_PROPOSED, ec="k",
-                 lw=0.6))
-    ax.text(6.12, 1.15, "meas.\nfactor", fontsize=7, va="center",
-            ha="left", color="#333")
+        fac(cx, YZ, fc=C_PROPOSED)
+        seg(cx, YX-R, cx, YZ+0.065); seg(cx, YZ-0.065, cx, YB+R)
+    ax.annotate(
+        r"$\rho(r_t/\sqrt{R}),\;\;r_t=z_t-h(\bar{\mathbf{p}}_t{+}\delta\mathbf{p}_t)-\mathbf{A}_t^{\top}\boldsymbol{\beta}_t-S_t$",
+        xy=(xs[1]+0.09, YZ-0.06), xytext=(7.9, 0.42),
+        fontsize=7.5, ha="center", va="center", color="#0a3355",
+        arrowprops=dict(arrowstyle="->", lw=0.7, ls="--", color="#0a3355",
+                        alpha=0.7))
+
+    # ---- factor parameters (dashed inputs, not variables) ----------------
+    ax.annotate(r"INS mech.: $\mathbf{f}^n,\,\mathbf{C}^n_b\rightarrow \boldsymbol{\Phi}_t,\mathbf{Q}_t$",
+                xy=((xs[2]+xs[3])/2, YX+0.09), xytext=(12.15, 5.12),
+                fontsize=6.8, color="0.25", ha="left",
+                arrowprops=dict(arrowstyle="->", lw=0.7, ls="--", color="0.45"))
+    ax.annotate(r"fluxgate: $\mathbf{B}_t\rightarrow \mathbf{A}_t$;  map: $h,\ \mathbf{g}_t=\nabla h$",
+                xy=(xs[3], YZ), xytext=(12.15, 2.85),
+                fontsize=6.8, color="0.25", ha="left",
+                arrowprops=dict(arrowstyle="->", lw=0.7, ls="--", color="0.45"))
+
+    # ---- state contents annotations --------------------------------------
+    ax.text(0.1, 5.32, "INS error state  "
+            r"$\mathbf{x}_t=[\,\delta\mathbf{p}\;\delta\mathbf{v}\;\boldsymbol{\psi}\;"
+            r"h_a\;\hat{a}\;\mathbf{b}_a\;\mathbf{b}_g\;S\,]^{\top}\in\mathbb{R}^{18}$",
+            fontsize=7.5, ha="left", color="#0a3355")
+    ax.text(0.1, 0.02, "TL coefficients  "
+            r"$\boldsymbol{\beta}_t\in\mathbb{R}^{n_\beta}$"
+            "\n(permanent 3, induced 6, eddy 9, bias 1)",
+            fontsize=7, ha="left", va="bottom", color="#7a5200")
+
+    # ---- optional sensor-error variables ----------------------------------
+    thx, thy = 13.6, 1.05
+    var(thx, thy, r"$\boldsymbol{\theta}$", "#e9e9e9", r=0.27, ec="0.4", ls="--")
+    for cx in xs[2:]:
+        seg(thx-0.24, thy+0.14, cx+0.10, YZ-0.10, ls="--", color="0.55", lw=0.7)
+    ax.text(thx+0.38, thy, "optional sensor-error\nvariables (Sec. III-F):\n"
+            r"$\{a_k,d_k\},\,b^{\mathrm{hi}},\,\gamma_0,\gamma_1$"
+            "\n(couple to every $z_t$)",
+            fontsize=6.4, ha="left", va="center", color="#333")
+
     fig.savefig(os.path.join(OUT, "fig_graph.pdf"))
     plt.close(fig)
 
