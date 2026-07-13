@@ -22,12 +22,13 @@ def fig_breadth():
     """Table IV as a grouped log-scale bar chart: two causal baselines
     (weak online-TL EKF, strong EKF+TL+NN) vs the NN-free FGO window."""
     C_WEAK = "#9aa4b2"   # weak baseline (online-TL EKF), muted gray
-    rows = [  # (label, EKF-online, EKF+TL+NN, FGO-win); None->div, "err"->off-map
-        ("1003.02  M4", None, 99.1, 42.6), ("1003.02  M5", 28.1, 33.8, 21.7),
-        ("1003.08  M4", "err", 46.4, 26.1), ("1003.08  M5", 21.1, 18.8, 12.4),
-        ("1006.08  M4", None, 1371.0, 193.9), ("1006.08  M5", 117.5, 34.6, 122.0),
-        ("1007.02  M4", None, 114.8, 38.6), ("1007.02  M5", 31.6, 29.3, 14.5),
-        ("1007.06  M4", 46.7, 42.2, 32.7), ("1007.06  M5", 17.8, 17.8, 13.8),
+    rows = [  # ordered by nav-usability: FF first, SV next, CAL last (excluded)
+        # (label, EKF-online, EKF+TL+NN, FGO-win); None->div, "err"->off-map
+        ("1007.06  M4  (FF)", 46.7, 42.2, 32.7), ("1007.06  M5  (FF)", 17.8, 17.8, 13.8),
+        ("1007.02  M4  (FF)", None, 114.8, 38.6), ("1007.02  M5  (FF)", 31.6, 29.3, 14.5),
+        ("1003.02  M4  (SV)", None, 99.1, 42.6), ("1003.02  M5  (SV)", 28.1, 33.8, 21.7),
+        ("1003.08  M4  (SV)", "err", 46.4, 26.1), ("1003.08  M5  (SV)", 21.1, 18.8, 12.4),
+        ("1006.08  M4  (cal.)", None, 1371.0, 193.9), ("1006.08  M5  (cal.)", 117.5, 34.6, 122.0),
     ]
     labels = [r[0] for r in rows]
     y = np.arange(len(rows))[::-1]
