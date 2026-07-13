@@ -798,22 +798,23 @@ released code). The same $\mathbf{P}_0$, $\mathbf{Q}$, $R$, and TL settings driv
 both the causal EKF and the window smoother.}
 \label{tab:params}
 \centering
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{llr}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}llr@{}}
 \toprule
 Group & Parameter & Value \\
 \midrule
 Measurement & noise std.\ $\sqrt{R}$ & \SI{12}{\nano\tesla} \\
-FOGM $S$ & $(\sigma_S,\tau)$ & (\SI{3}{\nano\tesla}, \SI{180}{\second}) \\
-Initial $\mathbf{P}_0$ & position / altitude / velocity std. &
-  \SI{0.1}{}/\SI{1.0}{\meter}, \SI{1.0}{\meter\per\second} \\
-TL prior & $\mathbf{P}_0^{\beta}$ & $\mathbf{I}\,(1.0)^2$ \\
-TL random walk & $\mathbf{Q}^{\beta}$ & $\mathbf{I}\,(1.0)^2\Delta t$ \\
-TL basis & terms (Appendix~\ref{app:tl}) & perm.+ind.+eddy+bias (19) \\
-Window & $L_w$ / $L_o$ / $\Delta t$ &
-  \SI{300}{\second} / \SI{90}{\second} / \SI{0.1}{\second} \\
-Robust & Huber $\delta$; IRLS & 1.345; from 2nd iter., $w\in[10^{-6},1]$ \\
-Gauss--Newton & max.\ iterations / tolerance & 5 / $10^{-4}$ \\
+FOGM $S$ & $(\sigma_S,\tau)$ & \SI{3}{\nano\tesla}, \SI{180}{\second} \\
+Initial $\mathbf{P}_0$ & pos.\ / alt.\ std. & \SI{0.1}{} / \SI{1.0}{\meter} \\
+ & velocity std.\ (per axis) & \SI{1.0}{\meter\per\second} \\
+TL prior / walk & $\mathbf{P}_0^{\beta}$;\; $\mathbf{Q}^{\beta}$ &
+  $\mathbf{I}(1.0)^2$;\; $\mathbf{I}(1.0)^2\Delta t$ \\
+TL basis & terms (App.~\ref{app:tl}) & P{+}I{+}E{+}bias (19) \\
+Window & $L_w$ / $L_o$ / $\Delta t$ [s] & 300 / 90 / 0.1 \\
+Robust & Huber $\delta$ & 1.345 \\
+ & IRLS & 2nd iter.\ on, $w\in[10^{-6},1]$ \\
+Gauss--Newton & max.\ iter.\ / tol. & 5 / $10^{-4}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -911,19 +912,21 @@ window look-ahead: the coefficients are identified from data on both sides of ea
 committed epoch, whereas the EKF must commit with past data only.
 
 The window length itself trades under-determination against staleness.
-Fig.~\ref{fig:winlen} plots DRMS against $L_w$ on this line: the \SI{2}{\minute}
-window under-determines the coefficients, the full-line static batch cannot track
-their drift, and a \SI{5}{\minute} window sits at the resulting sweet spot. The curve
-is U-shaped rather than monotone, mirroring the expressiveness tradeoff discussed in
-Section~\ref{sec:observability}, and it makes $L_w$ a physically interpretable knob
-rather than a free hyperparameter.
+Fig.~\ref{fig:winlen} plots DRMS at the three lengths evaluated on this line: the
+\SI{2}{\minute} window under-determines the coefficients, the full-line static
+batch cannot track their drift, and the \SI{5}{\minute} window is the best of the
+three. The tradeoff mirrors the expressiveness discussion of
+Section~\ref{sec:observability} and makes $L_w$ a physically interpretable knob
+rather than a free hyperparameter, though a denser sweep (and other lines, where
+the balance can shift toward longer windows) is left for the revision.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.92\columnwidth]{figs/fig_winlen.pdf}
-\caption{Window length versus accuracy on line 1007.06 (cold start). A
-\SI{5}{\minute} window is the sweet spot between the under-determined
-\SI{2}{\minute} window and the drift-blind static batch (full line).}
+\caption{Window length versus accuracy on line 1007.06 (cold start), at the
+three evaluated lengths. The \SI{5}{\minute} window balances the
+under-determined \SI{2}{\minute} window against the drift-blind static batch
+(full line).}
 \label{fig:winlen}
 \end{figure}
 
@@ -1095,8 +1098,20 @@ both sides of each committed state before that state is fixed; later-observable
 calibration then protects earlier navigation. This is the same structural reason
 that batch and incremental smoothers outperform filtering in visual--inertial
 estimation~\cite{forster2017,qin2018}, here applied to the compensation problem.
-Table~\ref{tab:compare} positions the estimator families along the axes that matter
-for cold-start compensation.
+
+A consequence worth stating plainly is that \emph{when both estimators converge,
+similar accuracy is expected, and observed}. Both process the same measurements
+under the same models, and the accuracy gain of a fixed-lag smoother over a
+well-tuned filter is bounded by the smoothing gain, which is modest once the
+transient has passed (Mag~5: \SIrange{3}{17}{\meter} in Table~\ref{tab:breadth};
+near-parity with the reported EKF+TL+NN in Table~\ref{tab:1007}). The
+contribution is therefore not steady-state accuracy but \emph{which regimes
+survive}: the causal filter fails outright on four of five Mag~4 cold starts,
+where the window smoother stays bounded, and the smoother reaches its converged
+accuracy without the neural network, its online-training design, or the
+associated verification burden. In operational terms, the window buys the cold
+start, not the cruise. Table~\ref{tab:compare} positions the estimator families
+along the axes that matter for cold-start compensation.
 
 \begin{table}[t]
 \caption{Estimator families for cold-start map-matching compensation.

@@ -36,7 +36,6 @@ def fig_map():
     cb.ax.tick_params(labelsize=7)
     ax.set_xlabel("longitude [deg]")
     ax.set_ylabel("latitude [deg]")
-    ax.set_title("Eastern_395 anomaly map and flight line")
     ax.legend(loc="upper right", framealpha=0.9, fontsize=7)
 
     # zoom inset: a short mid-flight window where the estimates separate
@@ -69,20 +68,27 @@ def fig_poserr():
     # improvement visible at a glance
     ax.fill_between(t["tmin"], t["efgo"], t["eekf"],
                     where=(t["eekf"] >= t["efgo"]), color=C_PROPOSED,
-                    alpha=0.12, interpolate=True, label="FGO improvement")
-    ax.plot(t["tmin"], t["eins"], ":", color=C_REF, lw=1.3,
-            label="INS  (%.0f m)" % np.sqrt(np.mean(t["eins"] ** 2)))
-    ax.plot(t["tmin"], t["eekf"], "--", color=C_BASE1, lw=1.4,
-            label="EKF  (%.1f m)" % np.sqrt(np.mean(t["eekf"] ** 2)))
-    ax.plot(t["tmin"], t["efgo"], "-", color=C_PROPOSED, lw=1.9,
-            label="FGO  (%.1f m)" % np.sqrt(np.mean(t["efgo"] ** 2)))
+                    alpha=0.12, interpolate=True)
+    ax.plot(t["tmin"], t["eins"], ":", color=C_REF, lw=1.3)
+    ax.plot(t["tmin"], t["eekf"], "--", color=C_BASE1, lw=1.4)
+    ax.plot(t["tmin"], t["efgo"], "-", color=C_PROPOSED, lw=1.9)
     ax.set_xlabel("time [min]")
     ax.set_ylabel("horizontal error [m]")
     ax.set_ylim(0, np.percentile(t["eins"], 99) * 1.05)
     ax.set_xlim(t["tmin"][0], t["tmin"][-1])
-    ax.grid(True)
-    ax.legend(loc="upper left", framealpha=0.9, title="DRMS", title_fontsize=7.5)
-    ax.set_title("Flt1003 line 1003.02 — position error")
+    ax.grid(True, axis="y")
+    # selective direct labels (dataviz: identity not by color alone)
+    tm = t["tmin"]
+    ax.annotate("INS  (%.0f m DRMS)" % np.sqrt(np.mean(t["eins"]**2)),
+                (tm[len(tm)//2], np.max(t["eins"])*0.97), fontsize=7,
+                color=C_REF, ha="center")
+    ax.annotate("EKF  (%.1f m)" % np.sqrt(np.mean(t["eekf"]**2)),
+                (tm[-1], t["eekf"][-1]), textcoords="offset points",
+                xytext=(-2, 30), fontsize=7, color=C_BASE1, ha="right")
+    ax.annotate("FGO  (%.1f m)" % np.sqrt(np.mean(t["efgo"]**2)),
+                (tm[-1], t["efgo"][-1]), textcoords="offset points",
+                xytext=(-2, 10), fontsize=7, color=C_PROPOSED, ha="right",
+                weight="bold")
     despine(ax)
     fig.savefig(os.path.join(OUT, "fig_poserr.pdf"))
     plt.close(fig)
@@ -94,9 +100,19 @@ def fig_cdf():
     def cdf(e, **kw):
         xs = np.sort(e); ys = np.arange(1, len(xs)+1) / len(xs)
         ax.plot(xs, ys, **kw)
-    cdf(t["eins"], ls=":", color=C_REF, lw=1.4, label="INS")
-    cdf(t["eekf"], ls="--", color=C_BASE1, lw=1.5, label="EKF")
-    cdf(t["efgo"], ls="-", color=C_PROPOSED, lw=1.9, label="FGO (proposed)")
+    cdf(t["eins"], ls=":", color=C_REF, lw=1.4)
+    cdf(t["eekf"], ls="--", color=C_BASE1, lw=1.5)
+    cdf(t["efgo"], ls="-", color=C_PROPOSED, lw=1.9)
+    # direct labels at the 0.55 quantile of each curve
+    ax.annotate("INS", (np.percentile(t["eins"], 55), 0.55),
+                textcoords="offset points", xytext=(8, -4), fontsize=7,
+                color=C_REF, ha="left")
+    ax.annotate("EKF", (np.percentile(t["eekf"], 72), 0.72),
+                textcoords="offset points", xytext=(8, -4), fontsize=7,
+                color=C_BASE1, ha="left")
+    ax.annotate("FGO (proposed)", (np.percentile(t["efgo"], 30), 0.30),
+                textcoords="offset points", xytext=(9, -3), fontsize=7,
+                color=C_PROPOSED, ha="left", weight="bold")
     # mark the 95th percentile of each
     for e, c in ((t["efgo"], C_PROPOSED), (t["eekf"], C_BASE1)):
         p95 = np.percentile(e, 95)
@@ -108,9 +124,7 @@ def fig_cdf():
     ax.set_ylabel("empirical CDF")
     ax.set_xlim(0, np.percentile(t["eins"], 99))
     ax.set_ylim(0, 1.02)
-    ax.grid(True)
-    ax.legend(loc="lower right", framealpha=0.9)
-    ax.set_title("Error distribution, line 1003.02")
+    ax.grid(True, axis="both")
     despine(ax)
     fig.savefig(os.path.join(OUT, "fig_cdf.pdf"))
     plt.close(fig)

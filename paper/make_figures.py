@@ -42,9 +42,9 @@ def fig_breadth():
                     fontsize=7, color=C_BASE1, style="italic")
         else:
             ax.barh(yy + h/2, ek, height=h, color=C_BASE1, alpha=0.9,
-                    edgecolor="k", linewidth=0.3)
+                    edgecolor="white", linewidth=0.5)
         ax.barh(yy - h/2, fg, height=h, color=C_PROPOSED,
-                edgecolor="k", linewidth=0.3)
+                edgecolor="white", linewidth=0.5)
     ax.set_yticks(y)
     ax.set_yticklabels(labels)
     ax.set_xscale("log")
@@ -56,8 +56,7 @@ def fig_breadth():
     ax.grid(True, axis="x", which="major")
     ax.legend(handles=[Patch(facecolor=C_BASE1, alpha=0.9, label="EKF, online TL (causal)"),
                        Patch(facecolor=C_PROPOSED, label="FGO window (proposed)")],
-              loc="lower right", framealpha=0.9)
-    ax.set_title("Cold-start cabin magnetometers, five lines")
+              loc="lower right", frameon=False)
     despine(ax)
     fig.savefig(os.path.join(OUT, "fig_breadth.pdf"))
     plt.close(fig)
@@ -73,9 +72,9 @@ def fig_coldstart():
     x = np.arange(len(methods)); w = 0.38
     fig, ax = plt.subplots(figsize=(COL_W, 2.4))
     c = [C_PROPOSED if o else C_BASE1 for o in ours]
-    b1 = ax.bar(x - w/2, m4, w, color=c, edgecolor="k", linewidth=0.3)
-    b2 = ax.bar(x + w/2, m5, w, color=c, alpha=0.5, edgecolor="k",
-                linewidth=0.3)
+    b1 = ax.bar(x - w/2, m4, w, color=c, edgecolor="white", linewidth=0.6)
+    b2 = ax.bar(x + w/2, m5, w, color=c, alpha=0.55, hatch="///",
+                edgecolor="white", linewidth=0.6)
     for i, o in enumerate(ours):
         if not o:
             ax.axvspan(i - 0.5, i + 0.5, color="0.5", alpha=0.08, zorder=0)
@@ -86,14 +85,13 @@ def fig_coldstart():
     ax.set_ylabel("horizontal DRMS [m]")
     ax.set_ylim(0, 142)
     ax.grid(True, axis="y")
-    leg1 = ax.legend(handles=[Patch(facecolor=C_PROPOSED, label="proposed (FGO)"),
-                              Patch(facecolor=C_BASE1, label="baseline (EKF+TL+NN)")],
-                     loc="upper left", framealpha=0.9, fontsize=7)
-    ax.add_artist(leg1)
-    ax.legend(handles=[Patch(facecolor="0.3", label="Mag 4"),
-                       Patch(facecolor="0.3", alpha=0.5, label="Mag 5")],
-              loc="upper right", framealpha=0.9, fontsize=7)
-    ax.set_title("Line 1007.06, uncompensated cabin mags")
+    ax.legend(handles=[Patch(facecolor=C_PROPOSED, label="FGO (proposed)"),
+                       Patch(facecolor=C_BASE1, label="EKF+TL+NN"),
+                       Patch(facecolor="0.45", label="Mag 4"),
+                       Patch(facecolor="0.45", alpha=0.55, hatch="///",
+                             label="Mag 5")],
+              loc="upper right", ncol=2, frameon=False, fontsize=6.8,
+              columnspacing=1.0, handlelength=1.4)
     despine(ax)
     fig.savefig(os.path.join(OUT, "fig_coldstart.pdf"))
     plt.close(fig)
@@ -232,8 +230,10 @@ def fig_winlen():
     m4 = [45.9, 37.0, 123.7]
     m5 = [17.1, 15.1, 68.1]
     fig, ax = plt.subplots(figsize=(COL_W, 2.15))
-    ax.plot(wl, m4, "-o", color=C_PROPOSED, lw=1.7, ms=4.5, label="Mag 4")
-    ax.plot(wl, m5, "--s", color=C_BASE1, lw=1.5, ms=4.0, label="Mag 5")
+    ax.plot(wl, m4, "o", color=C_PROPOSED, ms=5.5, label="Mag 4", zorder=4)
+    ax.plot(wl, m4, ":", color=C_PROPOSED, lw=1.1, alpha=0.7)
+    ax.plot(wl, m5, "s", color=C_BASE1, ms=5.0, label="Mag 5", zorder=4)
+    ax.plot(wl, m5, ":", color=C_BASE1, lw=1.1, alpha=0.7)
     for x, y in zip(wl, m4):
         ax.annotate("%.0f" % y, (x, y), textcoords="offset points",
                     xytext=(3, 5), fontsize=6.2, color=C_PROPOSED)
@@ -242,101 +242,125 @@ def fig_winlen():
     ax.set_xlabel("window length $L_w$ [min]")
     ax.set_ylabel("horizontal DRMS [m]")
     ax.set_ylim(0, 135)
-    ax.grid(True)
-    ax.axvspan(3.5, 7, color=C_PROPOSED, alpha=0.06)
-    ax.text(5, 128, "sweet spot", fontsize=6.5, ha="center", color="#0a3355")
-    ax.legend(loc="upper center", framealpha=0.9)
-    ax.set_title("Window length vs accuracy, line 1007.06")
+    ax.grid(True, axis="y")
+    ax.annotate("static\n(whole line)", (87, 123.7), textcoords="offset points",
+                xytext=(-4, -26), fontsize=6.2, color="0.35", ha="right")
+    ax.legend(loc="upper center", frameon=False)
     despine(ax)
     fig.savefig(os.path.join(OUT, "fig_winlen.pdf"))
     plt.close(fig)
 
 
 def fig_obs():
-    """Observability schematic: range(G), range(Psi), and their intersection."""
-    fig, ax = plt.subplots(1, 2, figsize=(COL_W, 1.9))
-    for a in ax:
-        a.set_xlim(-1.35, 1.35); a.set_ylim(-1.2, 1.35); a.axis("off")
+    """Observability geometry: range(G) vs range(Psi) (Proposition 1, cond. iii).
+    Soft filled span bands + origin marker; panel tags (a)/(b)."""
+    fig, axs = plt.subplots(1, 2, figsize=(COL_W, 1.85))
+    for a in axs:
+        a.set_xlim(-1.3, 1.3); a.set_ylim(-1.15, 1.25); a.axis("off")
         a.set_aspect("equal")
 
-    def plane(a, ang, color, label, lx, ly):
+    def span(a, ang, color, label, lx, ly, hw=0.055):
         th = np.deg2rad(ang)
         dx, dy = np.cos(th), np.sin(th)
-        a.plot([-dx, dx], [-dy, dy], color=color, lw=2.2)
-        a.text(lx, ly, label, color=color, fontsize=8, ha="center")
+        nx, ny = -dy*hw, dx*hw
+        a.fill([-dx+nx, dx+nx, dx-nx, -dx-nx],
+               [-dy+ny, dy+ny, dy-ny, -dy-ny],
+               color=color, alpha=0.18, lw=0)
+        a.plot([-dx, dx], [-dy, dy], color=color, lw=1.8,
+               solid_capstyle="round")
+        a.text(lx, ly, label, color=color, fontsize=7.5, ha="center")
 
-    plane(ax[0], 20, C_PROPOSED, r"range$(\mathbf{G})$", 1.05, 0.55)
-    plane(ax[0], 110, C_BASE1, r"range$(\boldsymbol{\Psi})$", -0.7, 0.95)
-    ax[0].plot(0, 0, "ko", ms=3)
-    ax[0].text(0, -1.12, "observable\n(intersect $=\\{\\mathbf{0}\\}$)",
-               ha="center", fontsize=7)
-    plane(ax[1], 25, C_PROPOSED, r"range$(\mathbf{G})$", 1.02, 0.62)
-    plane(ax[1], 30, C_BASE1, r"range$(\boldsymbol{\Psi})$", -0.55, -0.75)
-    ax[1].plot([-1.1, 1.1], [-0.53, 0.53], color=C_ACCENT, lw=1.0, ls=":")
-    ax[1].text(0, -1.12, "collapse\n(nontrivial overlap)", ha="center", fontsize=7)
+    # (a) transversal: separable
+    span(axs[0], 22, C_PROPOSED, r"range$(\mathbf{G})$", 0.88, 0.62)
+    span(axs[0], 108, C_BASE1, r"range$(\boldsymbol{\Psi})$", -0.72, 0.92)
+    axs[0].plot(0, 0, "o", color="k", ms=3.5, zorder=5)
+    axs[0].annotate(r"$\{\mathbf{0}\}$", (0, 0), textcoords="offset points",
+                    xytext=(7, -9), fontsize=7)
+    axs[0].text(0, -1.08, "(a) separable", ha="center", fontsize=7.5,
+                color="#333")
+
+    # (b) near-collinear: confounded
+    span(axs[1], 24, C_PROPOSED, r"range$(\mathbf{G})$", 1.02, 0.28)
+    span(axs[1], 31, C_BASE1, r"range$(\boldsymbol{\Psi})$", -0.60, -0.75)
+    d = np.deg2rad(27.5)
+    axs[1].annotate("", xy=(1.05*np.cos(d), 1.05*np.sin(d)),
+                    xytext=(0, 0),
+                    arrowprops=dict(arrowstyle="-|>", lw=1.1, color="0.25"))
+    axs[1].text(-0.15, 0.62, "shared\ndirection", fontsize=6.4, color="0.25",
+                ha="center")
+    axs[1].plot(0, 0, "o", color="k", ms=3.5, zorder=5)
+    axs[1].text(0, -1.08, "(b) confounded", ha="center", fontsize=7.5,
+                color="#333")
     fig.savefig(os.path.join(OUT, "fig_obs.pdf"))
     plt.close(fig)
 
 
 def fig_pipeline():
-    """Double-column system architecture: sensors -> factor graph -> window
-    solver -> outputs, with the anomaly map feeding the map-match factor."""
-    fig, ax = plt.subplots(figsize=(7.0, 2.35))
+    """Double-column system architecture. One accent color (proposed blue),
+    neutral grays elsewhere; uniform box style; caption carries the title."""
+    fig, ax = plt.subplots(figsize=(7.0, 2.3))
     ax.set_xlim(0, 15.2); ax.set_ylim(0, 5.0); ax.axis("off")
+    NEUT_FC, NEUT_EC, INK = "#f2f4f7", "#9aa4b2", "#1f2937"
 
-    def box(x, y, w, h, txt, fc="#eef2f7", ec="#4a5568", fs=8, lw=1.0, tc="#111"):
-        ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.03",
+    def box(x, y, w, h, txt, fc=NEUT_FC, ec=NEUT_EC, fs=7.8, lw=0.9, tc=INK):
+        ax.add_patch(FancyBboxPatch((x, y), w, h,
+                     boxstyle="round,pad=0.035,rounding_size=0.09",
                      fc=fc, ec=ec, lw=lw))
         ax.text(x+w/2, y+h/2, txt, ha="center", va="center", fontsize=fs,
                 color=tc, zorder=5)
 
-    def arrow(x0, y0, x1, y1, color="#4a5568", lw=1.3):
+    def arrow(x0, y0, x1, y1, color="0.42", lw=1.1):
         ax.add_patch(FancyArrowPatch((x0, y0), (x1, y1),
-                     arrowstyle="-|>", mutation_scale=11, lw=lw, color=color,
-                     shrinkA=1, shrinkB=1))
+                     arrowstyle="-|>", mutation_scale=9, lw=lw, color=color,
+                     shrinkA=2, shrinkB=2))
 
-    # --- sensors (left column) ---
-    box(0.1, 3.5, 2.5, 1.0, "INS / IMU\n(Pinson error)", fc="#eef2f7")
-    box(0.1, 2.0, 2.5, 1.0, "3-axis fluxgate\n(TL basis $\\mathbf{A}_t$)", fc="#eef2f7")
-    box(0.1, 0.5, 2.5, 1.0, "scalar\nmagnetometer $z_t$", fc="#eef2f7")
+    # sensors (left)
+    box(0.1, 3.45, 2.5, 1.0, "INS / IMU\n$\\mathbf{f}^n,\\;\\mathbf{C}^n_b$")
+    box(0.1, 2.00, 2.5, 1.0, "3-axis fluxgate\n$\\mathbf{B}_t\\rightarrow\\mathbf{A}_t$")
+    box(0.1, 0.55, 2.5, 1.0, "scalar\nmagnetometer $z_t$")
 
-    # --- factor graph (center, highlighted) ---
-    gx, gy, gw, gh = 3.5, 0.35, 5.1, 4.3
-    ax.add_patch(FancyBboxPatch((gx, gy), gw, gh, boxstyle="round,pad=0.04",
-                 fc="#eaf2fb", ec=C_PROPOSED, lw=1.6))
-    ax.text(gx+gw/2, gy+gh-0.32, "Factor graph", ha="center", va="center",
-            fontsize=9, color=C_PROPOSED, weight="bold")
-    box(gx+0.35, 3.05, gw-0.7, 0.75, "process factors  $\\|\\mathbf{x}_{t+1}"
-        "-\\mathbf{\\Phi}_t\\mathbf{x}_t\\|$", fc="white", fs=7.5, ec="#8aa")
-    box(gx+0.35, 2.15, gw-0.7, 0.75, "TL compensation  $c_t=\\mathbf{A}_t^{\\top}"
-        "\\boldsymbol{\\beta}_t$", fc="#fff4de", fs=7.5, ec="#c99")
-    box(gx+0.35, 1.25, gw-0.7, 0.75, "map-match  $z_t-h(\\mathbf{p}_t)-c_t$",
-        fc="white", fs=7.5, ec="#8aa")
-    box(gx+0.35, 0.55, gw-0.7, 0.60, "sensor-error factors (heading, bias, "
-        "drift)", fc="white", fs=6.8, ec="#8aa")
+    # factor graph container (accent)
+    gx, gy, gw, gh = 3.6, 0.35, 5.0, 4.3
+    ax.add_patch(FancyBboxPatch((gx, gy), gw, gh,
+                 boxstyle="round,pad=0.045,rounding_size=0.12",
+                 fc="white", ec=C_PROPOSED, lw=1.5))
+    ax.text(gx+gw/2, gy+gh-0.30, "factor graph (Fig.\u20092)", ha="center",
+            va="center", fontsize=8.2, color=C_PROPOSED)
+    box(gx+0.35, 3.00, gw-0.7, 0.72,
+        "process factors  $\\|\\mathbf{x}_{t+1}-\\mathbf{\\Phi}_t\\mathbf{x}_t\\|_{\\mathbf{Q}_t^{-1}}$",
+        fs=7.2)
+    box(gx+0.35, 2.12, gw-0.7, 0.72,
+        "TL chain  $\\boldsymbol{\\beta}_t$ random walk  $\\mathbf{Q}^{\\beta}$",
+        fs=7.2)
+    box(gx+0.35, 1.24, gw-0.7, 0.72,
+        "map-match  $\\rho(r_t/\\sqrt{R})$", fs=7.2)
+    box(gx+0.35, 0.52, gw-0.7, 0.58,
+        "sensor-error variables $\\boldsymbol{\\theta}$ (optional)", fs=6.8)
 
-    # --- solver ---
-    box(9.5, 1.9, 2.6, 1.2, "Fixed-lag window\nGN/QR $+$ Huber",
-        fc="#eaf2fb", ec=C_PROPOSED, fs=8, lw=1.4, tc="#0a3355")
+    # solver (accent fill)
+    box(9.35, 1.85, 2.75, 1.3,
+        "fixed-lag window\ncommit $L_w{-}L_o$\ncarry $(\\hat{\\boldsymbol{\\chi}},\\mathbf{P})$",
+        fc="#e7eff9", ec=C_PROPOSED, fs=7.0, lw=1.2, tc="#0a3355")
 
-    # --- outputs ---
-    box(12.9, 3.0, 2.2, 1.05, "position\n$\\hat{\\mathbf{p}}_t$", fc="#e7f3ec",
-        ec="#1a7", fs=8)
-    box(12.9, 1.05, 2.2, 1.05, "TL coef.\n$\\hat{\\boldsymbol{\\beta}}_t$",
-        fc="#e7f3ec", ec="#1a7", fs=8)
+    # outputs (neutral)
+    box(12.85, 2.95, 2.25, 1.0, "position $\\hat{\\mathbf{p}}_t$")
+    box(12.85, 1.05, 2.25, 1.0, "compensation $\\hat{\\boldsymbol{\\beta}}_t$")
 
-    # sensor -> graph arrows
-    arrow(2.6, 4.0, 3.5, 3.42)
-    arrow(2.6, 2.5, 3.5, 2.52)
-    arrow(2.6, 1.0, 3.5, 1.62)
-    # graph -> solver -> outputs
-    arrow(gx+gw, 2.5, 9.5, 2.5)
-    arrow(12.1, 2.7, 12.9, 3.3)
-    arrow(12.1, 2.3, 12.9, 1.7)
-    # anomaly map box below graph feeding map-match factor
-    box(9.5, 0.15, 2.6, 1.15, "anomaly map\n$h(\\cdot)$ (IGRF core)", fc="#f3eaf7",
-        ec=C_ACCENT, fs=7.5)
-    arrow(9.5, 0.9, gx+gw-0.2, 1.55, color=C_ACCENT)
+    # map (neutral, dashed border = data source)
+    ax.add_patch(FancyBboxPatch((9.4, 0.18), 2.65, 1.05,
+                 boxstyle="round,pad=0.035,rounding_size=0.09",
+                 fc=NEUT_FC, ec=NEUT_EC, lw=0.9, ls=(0, (3, 2))))
+    ax.text(9.4+2.65/2, 0.18+1.05/2, "anomaly map $h(\\cdot)$\n(+ IGRF core)",
+            ha="center", va="center", fontsize=7.2, color=INK)
+
+    # arrows
+    arrow(2.60, 3.95, gx, 3.36)
+    arrow(2.60, 2.50, gx, 2.48)
+    arrow(2.60, 1.05, gx, 1.60)
+    arrow(gx+gw, 2.50, 9.40, 2.50)
+    arrow(12.05, 2.75, 12.85, 3.35)
+    arrow(12.05, 2.25, 12.85, 1.65)
+    arrow(9.85, 1.23, 9.05, 1.55)   # map -> map-match factor
     fig.savefig(os.path.join(OUT, "fig_pipeline.pdf"))
     plt.close(fig)
 
