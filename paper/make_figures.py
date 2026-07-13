@@ -20,9 +20,9 @@ os.makedirs(OUT, exist_ok=True)
 
 def fig_breadth():
     """Table II as a grouped log-scale bar chart; divergence made explicit."""
-    rows = [  # (label, EKF-online, FGO-win) ; EKF None -> divergence
+    rows = [  # (label, EKF-online, FGO-win); None -> diverged, "err" -> off-map abort
         ("1003.02  M4", None, 42.6), ("1003.02  M5", 28.1, 21.7),
-        ("1003.08  M4", None, 26.1), ("1003.08  M5", 21.1, 12.4),
+        ("1003.08  M4", "err", 26.1), ("1003.08  M5", 21.1, 12.4),
         ("1006.08  M4", None, 193.9), ("1006.08  M5", 117.5, 122.0),
         ("1007.02  M4", None, 38.6), ("1007.02  M5", 31.6, 14.5),
         ("1007.06  M4", 46.7, 32.7), ("1007.06  M5", 17.8, 13.8),
@@ -34,10 +34,11 @@ def fig_breadth():
     DIVX = 3e4
     for i, (_, ek, fg) in enumerate(rows):
         yy = y[i]
-        if ek is None:
+        if ek is None or ek == "err":
+            lab = "  diverged" if ek is None else "  err. (off-map)"
             ax.barh(yy + h/2, DIVX, height=h, color=C_BASE1, alpha=0.30,
                     hatch="////", edgecolor=C_BASE1, linewidth=0.6)
-            ax.text(DIVX, yy + h/2, "  diverged", va="center", ha="left",
+            ax.text(DIVX, yy + h/2, lab, va="center", ha="left",
                     fontsize=7, color=C_BASE1, style="italic")
         else:
             ax.barh(yy + h/2, ek, height=h, color=C_BASE1, alpha=0.9,
@@ -185,7 +186,7 @@ def fig_factorgraph():
     for cx in xs[2:]:
         seg(thx-0.24, thy+0.14, cx+0.10, YZ-0.10, ls="--", color="0.55", lw=0.7)
     ax.text(thx+0.38, thy, "optional sensor-error\nvariables (Sec. III-F):\n"
-            r"$\{a_k,d_k\},\,b^{\mathrm{hi}},\,\gamma_0,\gamma_1$"
+            r"$\{a_k,b_k\},\,b^{\mathrm{hi}},\,\gamma_0,\gamma_1$"
             "\n(couple to every $z_t$)",
             fontsize=6.4, ha="left", va="center", color="#333")
 

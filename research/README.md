@@ -50,8 +50,9 @@ Horizontal position **DRMS** [m], lower is better:
 | **FGO (RTS)** | **14.3** | 18 s |
 | **FGO (RTS + Huber)** | **14.0** | 16 s |
 
-**Batch solver check (10-min segment):** FGO-RTS 18.4 m vs global sparse GN/QR
-19.4 m — the two solvers converge to the same MAP estimate (RTS is ~2× faster on
+**Batch solver check (10-min segment):** EKF 47.9 m; FGO-RTS 18.4 m vs global
+sparse GN/QR 19.4 m (18.4 m with Huber) — the two solvers converge to the same MAP
+estimate (RTS is ~2× faster on
 the chain).
 
 **Online Tolles-Lawson (uncompensated cabin Mag 4):**

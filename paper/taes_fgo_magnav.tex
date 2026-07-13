@@ -47,8 +47,9 @@ Tolles--Lawson (TL) coefficients and a residual neural network. We show that a
 factor-graph formulation reaches the same accuracy without a neural network by
 carrying the TL coefficients as graph variables of a fixed-lag sliding-window
 smoother, so the compensation adapts along the flight. On the primary evaluation
-line of the SGL~2020 dataset the sliding-window smoother matches or beats a
-reproduced online EKF+TL+NN and the values published for it. Across five long
+line of the SGL~2020 dataset the sliding-window smoother beats a reimplemented
+online EKF+TL+NN on both cabin magnetometers and matches, to within fractions of a
+metre, the values reported for that filter. Across five long
 survey lines from three flights and two maps, it improves on a causal online-TL
 EKF on \num{8} of \num{9} cold-start cases and, importantly, remains bounded where
 the causal filter diverges. We also give an exact linear condition for the joint
@@ -167,7 +168,7 @@ calibration has recently been applied to the SGL benchmark~\cite{gnadt2022}. Mos
 relevant here, a residual neural network (NN) has been added on top of an online TL
 model, carried inside an EKF and trained online, to capture interference the linear
 basis misses~\cite{hager2026}; this reaches good cold-start accuracy on the SGL~2020
-cabin magnetometers and is, to our knowledge, the strongest published cold-start
+cabin magnetometers and is, to our knowledge, the strongest reported cold-start
 result on that benchmark. \emph{Nevertheless}, the network requires a carefully
 engineered online-training design to remain stable, adds opaque parameters whose
 behavior is hard to certify, and---being embedded in an EKF---inherits the same
@@ -214,8 +215,8 @@ The paper makes the following contributions:
         the joint observability of compensation and navigation and derive an
         exogeneity design rule for the compensation features
         (Section~\ref{sec:observability}).
-  \item \textbf{Reproduced baseline and breadth study:} we reproduce---rather than
-        cite---the online EKF+TL+NN result and evaluate both estimators on five
+  \item \textbf{Reimplemented baseline and breadth study:} we reimplement---rather
+        than merely cite---the online EKF+TL+NN result and evaluate both estimators on five
         long survey lines from three flights and two maps
         (Section~\ref{sec:results}).
   \item \textbf{Sensor-error factors:} we cast physically motivated
@@ -229,7 +230,7 @@ Section~\ref{sec:background} states the INS error model, the measurement, and th
 batch MAP problem. Section~\ref{sec:method} develops the sliding-window smoother
 and the compensation and sensor-error factors. Section~\ref{sec:observability}
 establishes the observability condition. Section~\ref{sec:baseline} describes the
-reproduced EKF+TL+NN baseline, and Section~\ref{sec:results} reports the
+reimplemented EKF+TL+NN baseline, and Section~\ref{sec:results} reports the
 experiments. Section~\ref{sec:discussion} discusses the results and their
 limitations, and Section~\ref{sec:conclusion} concludes.
 
@@ -272,7 +273,8 @@ linearized dynamics are
 \mathbf{w}_t\sim\mathcal{N}(\mathbf{0},\mathbf{Q}_t),
 \label{eq:dyn}
 \end{equation}
-where $\boldsymbol{\Phi}_t$ is the Pinson state-transition matrix and
+where $\boldsymbol{\Phi}_t$ is the Pinson state-transition matrix
+(Appendix~\ref{app:pinson}) and
 $\mathbf{Q}_t$ the process covariance; the FOGM block of $\boldsymbol{\Phi}_t$ is
 $e^{-\Delta t/\tau}$ with correlation time $\tau$.
 
@@ -309,8 +311,9 @@ of attitude-dependent basis terms~\cite{tolles1950,leliak1961,bickel1979},
 c_t=\mathbf{A}_t^{\top}\boldsymbol{\beta}_t,
 \label{eq:tl}
 \end{equation}
-where $\mathbf{A}_t\in\mathbb{R}^{m}$ is the TL basis row built from the three-axis
-fluxgate. With direction cosines $\hat{\mathbf{b}}_t=[\,u\;v\;w\,]^{\top}$ of the
+where $\mathbf{A}_t\in\mathbb{R}^{m}$ is the TL basis row of~\eqref{eq:tl} built
+from the three-axis fluxgate; its classical rank deficiency is a gauge freedom
+(Remark~\ref{rem:gauge}). With direction cosines $\hat{\mathbf{b}}_t=[\,u\;v\;w\,]^{\top}$ of the
 Earth field in body axes and total field magnitude $B_t$, the permanent (3),
 induced (6), and eddy-current (9) groups are
 \begin{equation}
@@ -332,7 +335,7 @@ $\boldsymbol{\chi}_t=(\mathbf{x}_t,\boldsymbol{\beta}_t)$ over a window of $N$
 epochs, the MAP estimate minimizes
 \begin{equation}
 \begin{aligned}
-J(\boldsymbol{\chi})=\;&\lVert\mathbf{x}_1-\mathbf{x}_0\rVert^2_{\mathbf{P}_0^{-1}}
+J(\boldsymbol{\chi})=\;&\lVert\boldsymbol{\chi}_1-\boldsymbol{\chi}_0\rVert^2_{\mathbf{P}_0^{-1}}
 +\sum_{t=1}^{N-1}\lVert\mathbf{x}_{t+1}-\boldsymbol{\Phi}_t\mathbf{x}_t\rVert^2_{\mathbf{Q}_t^{-1}}\\
 &+\sum_{t=1}^{N-1}\lVert\boldsymbol{\beta}_{t+1}-\boldsymbol{\beta}_t\rVert^2_{(\mathbf{Q}^{\beta})^{-1}}
 +\sum_{t=1}^{N}\rho\!\left(\frac{r_t(\boldsymbol{\chi}_t)}{\sqrt{R}}\right),
@@ -340,7 +343,10 @@ J(\boldsymbol{\chi})=\;&\lVert\mathbf{x}_1-\mathbf{x}_0\rVert^2_{\mathbf{P}_0^{-
 \label{eq:cost}
 \end{equation}
 with measurement residual $r_t(\boldsymbol{\chi}_t)=z_t-h(\mathbf{p}_t)-
-\mathbf{A}_t^{\top}\boldsymbol{\beta}_t-S_t$ and $\rho$ a possibly robust kernel.
+\mathbf{A}_t^{\top}\boldsymbol{\beta}_t-S_t$ and $\rho$ a possibly robust kernel;
+the prior term anchors both blocks of $\boldsymbol{\chi}_1=(\mathbf{x}_1,
+\boldsymbol{\beta}_1)$, at cold start with $\boldsymbol{\beta}$-block
+$\mathbf{P}_0^{\beta}$ (Table~\ref{tab:params}).
 We make the standard modeling assumptions of aided inertial
 navigation~\cite{groves2013,barshalom2001}.
 \begin{assumption}\label{as:model}
@@ -424,7 +430,14 @@ factor families, drawn explicitly in Fig.~\ref{fig:graph}:
 The INS mechanization, the fluxgate (through $\mathbf{A}_t$), and the anomaly map
 (through $h$ and $\mathbf{g}_t$) enter as \emph{known factor parameters}, not as
 estimated variables; the optional sensor-error variables $\boldsymbol{\theta}$ of
-Section~\ref{sec:method}-F attach to every measurement factor when enabled.
+Section~\ref{sec:method}-F attach to every measurement factor when enabled. Two
+implementation details: in the online estimator only the horizontal components of
+$\mathbf{g}_t$ are used (the vertical channel is baro-damped and the map is
+evaluated at survey altitude), whereas the batch validation of
+Section~\ref{sec:results}-A uses the full three-component gradient; and the
+implementation orders the state vector as
+$[\text{Pinson-17};\,\boldsymbol{\beta};\,S]$, a permutation of~\eqref{eq:state}
+that does not affect the estimate.
 Because consecutive coefficient blocks are chained rather than instantaneous,
 the compensation is identified from the whole trajectory, and because the batch
 solution uses future as well as past measurements, early navigation states benefit
@@ -460,11 +473,17 @@ leading stride of $L_w-L_o$ epochs, and carries the full smoothed state and
 covariance of the last committed epoch forward as a Gaussian prior for window
 $k{+}1$ (Fig.~\ref{fig:window}). The trailing overlap $L_o$ acts as bounded
 smoother look-ahead, so each committed estimate has seen $L_o$ epochs of future
-data. Carrying the full covariance---not just the mean---prevents the double-counting
-of information that a naive re-linearization would incur, and keeps navigation
-continuous across window boundaries. Algorithm~\ref{alg:window} summarizes the
-procedure; its per-window cost is constant in the line length, giving overall linear
-complexity.
+data. Carrying the full covariance---not just the mean---keeps navigation
+continuous across window boundaries. One approximation deserves note: the carried
+prior is the \emph{smoothed} state at the commit boundary, which has already seen
+the overlap measurements, and window $k{+}1$ processes those $L_o$ epochs again, so
+the overlap information is counted twice. An exactly consistent scheme would carry
+the forward-filtered state or marginalize the overlap; we accept the bounded
+optimism (the overlap is a fixed fraction, $L_o/L_w\!=\!0.3$, of each window) in
+exchange for the simpler implementation, and note that the reported DRMS is a
+comparison of means, unaffected by the covariance bookkeeping.
+Algorithm~\ref{alg:window} summarizes the procedure; its per-window cost is
+constant in the line length, giving overall linear complexity.
 
 \begin{figure}[t]
 \centering
@@ -488,7 +507,9 @@ window $L_w$, overlap $L_o$, prior $(\hat{\boldsymbol{\chi}}_0,\mathbf{P}_0)$
   \Repeat \Comment{robust Gauss--Newton}
     \State linearize residuals \eqref{eq:resid}; form weights $w_t$ from $\rho$
            \eqref{eq:irls}
-    \State solve normal equations by sparse QR (square-root SAM)~\cite{dellaert2006}
+    \State solve the linearized chain by an iterated RTS pass~\cite{rauch1965}
+           (equivalently, sparse QR / square-root SAM~\cite{dellaert2006};
+           Sec.~\ref{sec:method}-E)
     \State update $\boldsymbol{\chi}\gets\boldsymbol{\chi}+\Delta\boldsymbol{\chi}$
   \Until{converged}
   \State commit epochs $[s,s{+}L_w{-}L_o)$; recover $(\hat{\boldsymbol{\chi}},
@@ -512,7 +533,8 @@ long-line result, consistent with under-determination. The first window is seede
 with a diffuse prior on $\boldsymbol{\beta}$ (large $\mathbf{P}_0$ block) so the cold
 start is not biased toward zero interference, and the FOGM disturbance state absorbs
 the initial mismatch while the coefficients converge; subsequent windows inherit the
-tight carried covariance and converge in one or two Gauss--Newton iterations. This
+tight carried covariance and converge in a few Gauss--Newton iterations
+(typically $3$--$5$; Sec.~\ref{sec:results}-F). This
 warm-start is why the per-window iteration count stays low despite the nonlinearity
 of the map term.
 
@@ -531,7 +553,10 @@ w_t=\min\!\big(1,\;\delta/|u_t|\big),\qquad u_t=r_t/\sqrt{R},
 \label{eq:irls}
 \end{equation}
 so gross outliers are down-weighted toward an absolute-value penalty while inliers
-keep the efficient quadratic cost. Alternatives such as switchable
+keep the efficient quadratic cost. In the implementation the reweighting is applied
+from the second Gauss--Newton iteration onward (the first iteration is plain least
+squares) with $w_t$ clamped to $[10^{-6},1]$, and $\delta=1.345$ gives the standard
+$95\%$ Gaussian efficiency. Alternatives such as switchable
 constraints~\cite{sunderhauf2012} and dynamic covariance
 scaling~\cite{agarwal2013} fit the same graph interface and could replace
 \eqref{eq:huber} unchanged.
@@ -544,24 +569,28 @@ column). We factor it
 by column-pivoted QR on the square-root information matrix (square-root
 SAM~\cite{dellaert2006,dellaert2017}), which is numerically stable and exploits the
 chain sparsity; an iterated RTS pass~\cite{rauch1965} gives the identical estimate
-for the Gaussian case and we verify the two agree to sub-metre level in
-Section~\ref{sec:results}.
+for the Gaussian case and we verify the two agree to within a metre on a real-data
+segment in Section~\ref{sec:results} (the check covers the navigation-only chain;
+the joint TL problem is solved by the iterated-RTS path).
 
 \subsection{Physical sensor-error factors}
 The graph representation admits error states that a position-only grid or
 point-mass estimator cannot carry. Beyond TL we optionally augment
-$\boldsymbol{\chi}$ with four physically motivated scalar-magnetometer terms, each
-appearing additively in the residual~\eqref{eq:resid}:
+$\boldsymbol{\chi}$ with three physically motivated scalar-magnetometer error
+variables, each appearing additively in the residual~\eqref{eq:resid}, plus one
+measurement re-weighting:
 \begin{enumerate}
 \item \emph{Heading error}, modeled as a truncated Fourier series in the
 sensor--field angle $\theta_t$,
-$b^{\mathrm{hdg}}_t=\sum_{k=1}^{K}\big(a_k\cos k\theta_t+d_k\sin k\theta_t\big)$,
-with coefficients $\{a_k,d_k\}$ as graph variables;
+$b^{\mathrm{hdg}}_t=\sum_{k=1}^{K}\big(a_k\cos k\theta_t+b_k\sin k\theta_t\big)$,
+with coefficients $\{a_k,b_k\}$ as graph variables;
 \item \emph{Hard-iron bias} $b^{\mathrm{hi}}$, a constant offset variable;
 \item \emph{Linear drift} $b^{\mathrm{dr}}_t=\gamma_0+\gamma_1 t$, capturing slow
 electronics drift;
-\item \emph{Dead-zone weight}, a heteroscedastic measurement information
-$R_t^{-1}=R^{-1}\,\omega(z_t)$ that de-weights samples in a sensor dead band.
+\item \emph{Dead-zone weight}: not a graph variable but a heteroscedastic
+measurement information $R_t^{-1}=R^{-1}\,\omega(\theta_t)$ that de-weights
+samples near the optically-pumped-magnetometer dead zones (a de-weighting any
+estimator could apply; it is included for completeness of the sensor model).
 \end{enumerate}
 The augmented residual is $r_t=z_t-h(\mathbf{p}_t)-\mathbf{A}_t^{\top}\boldsymbol{\beta}_t
 -S_t-b^{\mathrm{hdg}}_t-b^{\mathrm{hi}}-b^{\mathrm{dr}}_t$. Each term is exogenous to
@@ -578,7 +607,11 @@ $\boldsymbol{\Psi}$ have rows $\mathbf{A}_t^{\!\top}$ (the TL regressor). To
 isolate the position--compensation coupling, restrict~\eqref{eq:meas} to the
 $(\delta\mathbf{p},\delta\boldsymbol{\beta})$ subspace, giving the window model
 $\mathbf{z}=\mathbf{G}\,\delta\mathbf{p}+\boldsymbol{\Psi}\,\delta\boldsymbol{\beta}+\boldsymbol{\eta}$
-(Fig.~\ref{fig:obs}).
+(Fig.~\ref{fig:obs}). This model freezes $\delta\mathbf{p}$ and
+$\delta\boldsymbol{\beta}$ over the window: it is a per-window surrogate for the
+time-varying system~\eqref{eq:dyn},~\eqref{eq:resid} that isolates the
+position--compensation coupling which a full observability Gramian would mix with
+the INS dynamics.
 
 \begin{figure}[t]
 \centering
@@ -597,8 +630,19 @@ A position perturbation $\delta\mathbf{p}$ is indistinguishable from a
 compensation adjustment---hence unobservable from map matching over the
 window---if and only if $\mathbf{G}\,\delta\mathbf{p}\in\mathrm{range}(\boldsymbol{\Psi})$.
 Consequently the joint state $(\delta\mathbf{p},\delta\boldsymbol{\beta})$ is
-observable if and only if
-$\mathrm{range}(\mathbf{G})\cap\mathrm{range}(\boldsymbol{\Psi})=\{\mathbf{0}\}$.
+observable if and only if the stacked matrix
+$[\,\mathbf{G}\;\;\boldsymbol{\Psi}\,]$ has full column rank; equivalently, if and
+only if all three of the following hold:
+\emph{(i)} $\ker\mathbf{G}=\{\mathbf{0}\}$ (the map gradient excites every
+position direction over the window);
+\emph{(ii)} $\ker\boldsymbol{\Psi}=\{\mathbf{0}\}$ (the compensation basis has
+full column rank); and
+\emph{(iii)}
+$\mathrm{range}(\mathbf{G})\cap\mathrm{range}(\boldsymbol{\Psi})=\{\mathbf{0}\}$
+(no shared direction). Condition \emph{(iii)} alone governs the
+position--compensation \emph{confounding}: when it fails, a position shift with
+$\mathbf{G}\,\delta\mathbf{p}\neq\mathbf{0}$ is reproduced exactly by a
+compensation change.
 \end{proposition}
 
 \begin{IEEEproof}
@@ -606,22 +650,56 @@ Two joint states $(\delta\mathbf{p},\delta\boldsymbol{\beta})$ and
 $(\delta\mathbf{p}',\delta\boldsymbol{\beta}')$ produce identical noise-free
 predictions iff
 $\mathbf{G}(\delta\mathbf{p}-\delta\mathbf{p}')=\boldsymbol{\Psi}(\delta\boldsymbol{\beta}'-\delta\boldsymbol{\beta})$,
-i.e.\ iff $\mathbf{G}(\delta\mathbf{p}-\delta\mathbf{p}')\in\mathrm{range}(\boldsymbol{\Psi})$.
-A nonzero position difference with this property exists iff
-$\mathrm{range}(\mathbf{G})\cap\mathrm{range}(\boldsymbol{\Psi})\neq\{\mathbf{0}\}$,
-which is exactly the negation of the stated condition; equivalently the stacked
-Jacobian $[\,\mathbf{G}\;\;\boldsymbol{\Psi}\,]$ is column-rank-deficient.
+i.e.\ iff
+$[\,\mathbf{G}\;\;\boldsymbol{\Psi}\,]
+[(\delta\mathbf{p}-\delta\mathbf{p}')^{\top}\;(\delta\boldsymbol{\beta}-\delta\boldsymbol{\beta}')^{\top}]^{\top}=\mathbf{0}$.
+The unobservable subspace is therefore exactly
+$\ker[\,\mathbf{G}\;\;\boldsymbol{\Psi}\,]$, and the joint state is observable iff
+$[\,\mathbf{G}\;\;\boldsymbol{\Psi}\,]$ has full column rank; the first statement
+follows by taking $\delta\boldsymbol{\beta}'$ free and $\delta\mathbf{p}'=\mathbf{0}$.
+For the three-condition equivalence: if \emph{(i)} fails, take
+$\delta\mathbf{p}\in\ker\mathbf{G}\setminus\{\mathbf{0}\}$, giving the kernel
+element $(\delta\mathbf{p},\mathbf{0})$; if \emph{(ii)} fails, take
+$\delta\boldsymbol{\beta}\in\ker\boldsymbol{\Psi}\setminus\{\mathbf{0}\}$, giving
+$(\mathbf{0},\delta\boldsymbol{\beta})$; if \emph{(iii)} fails, take
+$\mathbf{G}\,\delta\mathbf{p}=\boldsymbol{\Psi}\,\delta\boldsymbol{\beta}\neq\mathbf{0}$,
+giving $(\delta\mathbf{p},-\delta\boldsymbol{\beta})$. Conversely, let
+$(\delta\mathbf{p},\delta\boldsymbol{\beta})\neq(\mathbf{0},\mathbf{0})$ lie in the
+kernel, so $\mathbf{G}\,\delta\mathbf{p}=-\boldsymbol{\Psi}\,\delta\boldsymbol{\beta}$.
+If $\mathbf{G}\,\delta\mathbf{p}=\mathbf{0}$ then either
+$\delta\mathbf{p}\neq\mathbf{0}$ violates \emph{(i)} or
+$\delta\boldsymbol{\beta}\neq\mathbf{0}$ violates \emph{(ii)}; if
+$\mathbf{G}\,\delta\mathbf{p}\neq\mathbf{0}$ it is a nonzero shared direction,
+violating \emph{(iii)}.
 \end{IEEEproof}
 
-\begin{corollary}[Exogeneity]\label{cor:exo}
-If $\mathbf{A}_t$ is a function of aircraft attitude/fluxgate alone---exogenous to
-position---then $\mathrm{range}(\boldsymbol{\Psi})$ is generically transverse to
-the map-gradient subspace $\mathrm{range}(\mathbf{G})$ and the joint problem is
-observable at any basis dimension. If instead a compensation feature contains the
-map value $h(\mathbf{p})$ (for example the scalar magnetometer itself), its column
-aligns with $\mathrm{range}(\mathbf{G})$, forcing the intersection nonzero and
-collapsing observability.
+\begin{corollary}[Exogeneity and separability]\label{cor:exo}
+Suppose $\mathbf{A}_t$ is a function of aircraft attitude/fluxgate
+alone---exogenous to position. Then no column of $\boldsymbol{\Psi}$ is generated
+by the map gradient along the trajectory, and condition \emph{(iii)} holds for
+generic trajectories and maps (in particular, it requires the window to satisfy
+$N\ge\dim\mathrm{range}(\mathbf{G})+\dim\mathrm{range}(\boldsymbol{\Psi})$ and no
+$\boldsymbol{\Psi}$ column to be a linear combination of the map-gradient time
+series). Position--compensation \emph{separability} is then independent of the
+basis dimension: enlarging an exogenous basis can slow the coefficient estimate
+through \emph{(ii)} but cannot mask position. If instead a compensation feature
+contains the map value $h(\mathbf{p})$ (for example the scalar magnetometer
+itself), its column lies in $\mathrm{range}(\mathbf{G})$ by construction, forcing
+the intersection nonzero and collapsing observability.
 \end{corollary}
+
+\begin{remark}[TL rank deficiency as gauge freedom]\label{rem:gauge}
+Condition \emph{(ii)} fails for the classical TL basis itself: with unit direction
+cosines, the three induced diagonal columns sum to
+$B_t(u^2{+}v^2{+}w^2)=B_t$, collinear with the constant-bias column---the
+long-known collinearity of TL regression~\cite{leliak1961,noriega2015}. This is a
+\emph{gauge freedom} of the compensation, not a navigation defect: any
+$\delta\boldsymbol{\beta}\in\ker\boldsymbol{\Psi}$ leaves
+$c_t=\mathbf{A}_t^{\top}\boldsymbol{\beta}_t$---and hence every prediction and the
+position estimate---unchanged. The prior $\mathbf{P}_0$ and the random-walk factors
+select one representative of each gauge orbit. Separability of position from
+compensation is governed by \emph{(iii)} alone and is unaffected.
+\end{remark}
 
 Proposition~\ref{prop:obs} is exact but non-constructive: it does not yield a
 reliable scalar screening statistic, and in our experiments correlation-based
@@ -635,20 +713,23 @@ The condition is geometric, not statistical: it depends on the ranges of
 $\mathbf{G}$ and $\boldsymbol{\Psi}$ over the window, hence on the flight path and
 the local map gradient, not on noise levels. It explains two failure modes seen in
 practice. First, over a locally flat map $\mathbf{G}\!\approx\!\mathbf{0}$ and
-\emph{no} compensation can be separated from position---a map-information floor that
-bounds every estimator, and that we observe on the shortest line in
-Section~\ref{sec:results}. Second, an \emph{endogenous} feature such as the scalar
+condition \emph{(i)} fails: position is unobservable regardless of the
+compensation---a map-information floor that bounds every estimator, and that we
+observe on the shortest line in Section~\ref{sec:results}. Second, an \emph{endogenous} feature such as the scalar
 magnetometer reading itself makes a $\boldsymbol{\Psi}$ column collinear with
 $\mathbf{G}$, so the compensator silently absorbs the map signal; excluding such
 features (Section~\ref{sec:baseline}) is necessary for the baseline to converge.
 \end{remark}
 
-\section{Reproduced Online EKF+TL+NN Baseline}\label{sec:baseline}
-To compare against~\cite{hager2026} on equal footing we \emph{reproduce}, rather
-than cite, the online EKF+TL+NN cold start. The filter augments the Pinson error
-state with the online TL coefficients $\boldsymbol{\beta}$ and the weights of a
-small feed-forward network, all propagated as EKF states and updated online against
-\eqref{eq:meas}. Naively initialized, the reproduction diverged; three fixes, each
+\section{Reimplemented Online EKF+TL+NN Baseline}\label{sec:baseline}
+To compare against~\cite{hager2026} on equal footing we \emph{reimplement}, rather
+than merely cite, the online EKF+TL+NN cold start. The filter augments the Pinson
+error state with the online TL coefficients $\boldsymbol{\beta}$ and the weights of
+a small feed-forward network, all propagated as EKF states and updated online
+against \eqref{eq:meas}. Because neither the network architecture nor the
+natural-gradient training design of~\cite{hager2026} is released, ours is a
+reimplementation of the published design principles, not a line-for-line
+replication. Naively initialized, the reimplementation diverged; three fixes, each
 addressing a distinct and independently diagnosed failure, were required.
 
 \emph{(i) Bias-free network with DC initialization.} The map returns the anomaly
@@ -670,18 +751,21 @@ transient the compensation is grossly wrong, so the map residual is unreliable; 
 inflate the measurement variance and the coefficient process noise for the warm-up,
 then relax them.
 
-Concretely, the reproduced filter augments the navigation state with the permanent
-TL group and a single-hidden-layer network of eight units acting on that group,
-giving \num{41} network-weight states carried in the EKF; the FOGM disturbance state
-uses a $(\sigma,\tau)$ of $(\SI{3}{\nano\tesla},\SI{180}{\second})$ and the measurement
-variance is $12^2\,\mathrm{nT}^2$ after warm-up. The DC-removal step measures an
-interference offset of, e.g., $-1724\,\mathrm{nT}$ on Mag~4 and $+310\,\mathrm{nT}$
-on Mag~5, which if left in the target is what drove the untreated filter to
-divergence. With these three fixes the filter reaches
-\num{40.0}/\SI{17.5}{\meter} on Mag~4/5, inside the band published for
-it~\cite{hager2026} (Table~\ref{tab:1007}), and its late-half residual falls to
-\SIrange{117}{231}{\nano\tesla}; we take this as a faithful reproduction and use it
-as the baseline. We stress that the network only \emph{compensates}; the fixes are
+Concretely, the reimplemented filter augments the navigation state with the
+permanent TL group and a single-hidden-layer network of eight units acting on that
+group, giving \num{41} network-weight states carried in the EKF; the FOGM
+disturbance state uses a $(\sigma,\tau)$ of
+$(\SI{3}{\nano\tesla},\SI{180}{\second})$ and the measurement variance is
+$12^2\,\mathrm{nT}^2$ after warm-up. The DC-removal step measures an interference
+offset of, e.g., $-1724\,\mathrm{nT}$ on Mag~4 and $+310\,\mathrm{nT}$ on Mag~5,
+which if left in the target is what drove the untreated filter to divergence. With
+these three fixes the filter reaches \num{40.0}/\SI{17.5}{\meter} on Mag~4/5
+(Table~\ref{tab:1007}): on Mag~4 this lies inside the
+\SIrange{37}{58}{\meter} band spanned by the reported TL-only and TL+NN results,
+while on Mag~5 it is \SIrange{2.5}{3.5}{\meter} above the reported values
+(\SIrange{14}{15}{\meter})---a functioning, close, but not exact reimplementation.
+Its late-half residual falls to \SIrange{117}{231}{\nano\tesla}, and we use it as
+the baseline. We stress that the network only \emph{compensates}; the fixes are
 what make it observable jointly with position, which is the same requirement
 Corollary~\ref{cor:exo} places on our own compensation features.
 
@@ -697,11 +781,42 @@ to flight altitude with the IGRF core field restored. The metric is horizontal
 distance-RMS (DRMS) of position error after a \SI{10}{\minute} warm-up. \emph{Cold
 start} means the TL coefficients are initialized to zero with no calibration flight.
 For every comparison the EKF and FGO estimators use identical dynamics, map
-interpolation, and noise settings, so that only the estimator \emph{structure}
-differs. Unless noted, the window smoother uses $L_w=\SI{5}{\minute}$,
-$L_o=\SI{2}{\minute}$, and the Huber kernel~\eqref{eq:huber}. All numbers are
+interpolation, and noise settings (Table~\ref{tab:params}); the window smoother
+additionally applies the Huber kernel~\eqref{eq:huber}, whose isolated
+contribution is reported separately in Table~\ref{tab:1007}
+(\SI{37.0}{}$\rightarrow$\SI{32.6}{\meter} on Mag~4), so the reader can attribute
+the remaining margin to the estimator structure. Unless noted, the window smoother
+uses $L_w=\SI{5}{\minute}$ and $L_o=\SI{90}{\second}$; $L_w$ was selected on line
+1007.06 (Fig.~\ref{fig:winlen}) and then held fixed for every other line, so the
+breadth results of Table~\ref{tab:breadth} are not per-line tuned. All numbers are
 produced by continuous-integration scripts on the code branch and are reproducible
 from it.
+
+\begin{table}[t]
+\caption{Estimator settings used for all cold-start results (values from the
+released code). The same $\mathbf{P}_0$, $\mathbf{Q}$, $R$, and TL settings drive
+both the causal EKF and the window smoother.}
+\label{tab:params}
+\centering
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llr}
+\toprule
+Group & Parameter & Value \\
+\midrule
+Measurement & noise std.\ $\sqrt{R}$ & \SI{12}{\nano\tesla} \\
+FOGM $S$ & $(\sigma_S,\tau)$ & (\SI{3}{\nano\tesla}, \SI{180}{\second}) \\
+Initial $\mathbf{P}_0$ & position / altitude / velocity std. &
+  \SI{0.1}{}/\SI{1.0}{\meter}, \SI{1.0}{\meter\per\second} \\
+TL prior & $\mathbf{P}_0^{\beta}$ & $\mathbf{I}\,(1.0)^2$ \\
+TL random walk & $\mathbf{Q}^{\beta}$ & $\mathbf{I}\,(1.0)^2\Delta t$ \\
+TL basis & terms (Appendix~\ref{app:tl}) & perm.+ind.+eddy+bias (19) \\
+Window & $L_w$ / $L_o$ / $\Delta t$ &
+  \SI{300}{\second} / \SI{90}{\second} / \SI{0.1}{\second} \\
+Robust & Huber $\delta$; IRLS & 1.345; from 2nd iter., $w\in[10^{-6},1]$ \\
+Gauss--Newton & max.\ iterations / tolerance & 5 / $10^{-4}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Batch estimator on real data}
 We first validate the estimator on line 1003.02 (Flt1003, \SI{63}{\minute}) with the
@@ -740,7 +855,7 @@ full line & \textbf{FGO (RTS, Huber)} & \textbf{14.0} \\
 \midrule
 \SI{10}{\minute} & EKF & 47.9 \\
 \SI{10}{\minute} & FGO (RTS) & 18.4 \\
-\SI{10}{\minute} & FGO (GN/QR) & 19.3 \\
+\SI{10}{\minute} & FGO (GN/QR) & 19.4 \\
 \SI{10}{\minute} & FGO (GN/QR, Huber) & 18.4 \\
 \bottomrule
 \end{tabular}
@@ -760,16 +875,17 @@ the EKF and the factor-graph (FGO) estimates track it.}
 \includegraphics[width=0.98\columnwidth]{figs/fig_poserr.pdf}
 \caption{Horizontal position error on line 1003.02. The batch factor graph (FGO,
 blue) holds a tighter bound than the EKF (red) across the line; the shaded band
-marks the FGO improvement, and free inertial (INS) diverges.}
+marks the FGO improvement, and free inertial (INS) diverges. Legend DRMS values are
+computed over the full line, without the warm-up exclusion of Table~\ref{tab:bench}.}
 \label{fig:poserr}
 \end{figure}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\columnwidth]{figs/fig_cdf.pdf}
-\caption{Empirical CDF of horizontal error on line 1003.02. The proposed FGO
-reaches its 95th percentile at less than half the EKF's error; both bound the
-free-inertial error by an order of magnitude.}
+\caption{Empirical CDF of horizontal error on line 1003.02 (full line, as in
+Fig.~\ref{fig:poserr}). The proposed FGO reaches its 95th percentile at less than
+half the EKF's error; both bound the free-inertial error by an order of magnitude.}
 \label{fig:cdf}
 \end{figure}
 
@@ -782,12 +898,15 @@ single coefficient vector over the whole line; it underfits the time-varying
 interference and degrades to \num{123.7}/\SI{68.1}{\meter}. Allowing the
 compensation to adapt with a \SI{5}{\minute} window recovers it to
 \num{37.0}/\SI{15.1}{\meter}, and the Huber kernel further trims transient outliers
-to \num{32.6}/\SI{14.2}{\meter}. Our reproduced online EKF+TL+NN reaches
-\num{40.0}/\SI{17.5}{\meter}---inside the band published for that
-filter~\cite{hager2026}, confirming a faithful reproduction---while the published
-TL-only EKF is weaker still. The window smoother therefore matches or beats the
-NN-augmented filter on both sensors \emph{without any neural network}, using only
-the linear TL basis carried as graph variables. We attribute the margin to the
+to \num{32.6}/\SI{14.2}{\meter}. Our reimplemented online EKF+TL+NN reaches
+\num{40.0}/\SI{17.5}{\meter} (Section~\ref{sec:baseline} details how close this is
+to the reported operating point), while the reported TL-only EKF is weaker still on
+Mag~4. The window smoother beats the reimplemented NN-augmented filter on both
+sensors \emph{without any neural network}, using only the linear TL basis carried
+as graph variables; against the values reported in~\cite{hager2026} it is
+\SI{4.4}{\meter} better on Mag~4 and \SI{0.2}{\meter} behind on Mag~5. This
+comparison is on the single line 1007.06---the line~\cite{hager2026}
+evaluates---so the NN baseline breadth across the other four lines remains untested. We attribute the margin to the
 window look-ahead: the coefficients are identified from data on both sides of each
 committed epoch, whereas the EKF must commit with past data only.
 
@@ -822,9 +941,9 @@ FGO-online, window \SI{2}{\minute} & 45.9 & 17.1 \\
 FGO-online, window \SI{5}{\minute} & 37.0 & 15.1 \\
 \textbf{FGO-online, window \SI{5}{\minute} + Huber} & \textbf{32.6} & \textbf{14.2} \\
 \midrule
-EKF+TL+NN, reproduced~\cite{hager2026} & 40.0 & 17.5 \\
-EKF+TL+NN, published~\cite{hager2026} & 37 & 14 \\
-EKF+TL-only, published~\cite{hager2026} & 58 & 15 \\
+EKF+TL+NN, reimplemented~\cite{hager2026} & 40.0 & 17.5 \\
+EKF+TL+NN, reported~\cite{hager2026} & 37 & 14 \\
+EKF+TL-only, reported~\cite{hager2026} & 58 & 15 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -833,38 +952,44 @@ EKF+TL-only, published~\cite{hager2026} & 58 & 15 \\
 \centering
 \includegraphics[width=0.98\columnwidth]{figs/fig_coldstart.pdf}
 \caption{Line 1007.06 cold start on the uncompensated cabin magnetometers. The
-NN-free fixed-lag window (left of the divider) matches or beats the reproduced and
-published EKF+TL+NN (shaded, right).}
+NN-free fixed-lag window (left of the divider) compares against the reimplemented
+and reported EKF+TL+NN (shaded, right).}
 \label{fig:coldstart}
 \end{figure}
 
 \subsection{Breadth across lines, flights, and maps}
 Table~\ref{tab:breadth} runs the same cold-start TL model through the causal
 online-TL EKF and the fixed-lag window smoother on five long survey lines spanning
-three flights and two maps. The window smoother is better on \num{8} of \num{9}
-cold-start cases (Fig.~\ref{fig:breadth}). On the noisy Mag~4 the causal EKF diverges from the cold start to
-tens of kilometers on three lines, whereas the window smoother stays bounded,
-because its per-window relinearization lets later-observable calibration protect
-earlier navigation. The lone exception is a \SI{14}{\minute} line on which every
-method is weak, reflecting a map-information floor for short lines.
+three flights and two maps. Counting the nine cases in which the EKF returns a
+finite DRMS (the errored run is excluded from the count), the window smoother is
+better on \num{8} of \num{9} (Fig.~\ref{fig:breadth}). On the noisy Mag~4 the
+causal EKF diverges from the cold start to tens of kilometers on three lines, and
+on a fourth it leaves the map region entirely and the run aborts, whereas the
+window smoother stays bounded on all five, because its per-window relinearization
+lets later-observable calibration protect earlier navigation. The lone exception
+is a \SI{14}{\minute} line on which every method is weak, reflecting a
+map-information floor for short lines.
 
 Reading the table by case sharpens the picture. On the three lines where the causal
-EKF diverges (1003.02, 1003.08, and 1007.02 on Mag~4), the divergence is to
-$1.7$--$42\times10^{3}$\,m---the filter has committed to a wrong position from which
-the later, correct calibration cannot recover it---whereas the window smoother stays
-at \SIrange{26}{43}{\meter}. On the well-conditioned Mag~5 sensor both estimators are
-stable and the window still wins on four of five lines, by \SIrange{3}{17}{\meter},
-the residual benefit of the look-ahead. The single case the EKF wins (1006.08 Mag~5,
-$117.5$ vs \SI{122.0}{\meter}) is the short line where neither method does well and
-the difference is within run-to-run variability. Averaging the bounded cases, the
-window reduces DRMS by \SI{28}{\percent} relative to the causal EKF while removing
-the divergence mode entirely---the two effects the fixed-lag formulation was designed
-to provide.
+EKF diverges with a finite value (1003.02, 1006.08, and 1007.02 on Mag~4), the
+divergence is to $17$--$42\times10^{3}$\,m---the filter has committed to a wrong
+position from which the later, correct calibration cannot recover it---whereas the
+window smoother stays at \SIrange{39}{194}{\meter}; on 1003.08 Mag~4, where the EKF
+ran off the map, the window smoother reaches \SI{26.1}{\meter}. On the
+well-conditioned Mag~5 sensor both estimators are stable and the window still wins
+on four of five lines, by \SIrange{3}{17}{\meter}, the residual benefit of the
+look-ahead. The single case the EKF wins (1006.08 Mag~5, $117.5$ vs
+\SI{122.0}{\meter}, a \SI{4.5}{\meter} gap) is the short line where neither method
+extracts much map information. Averaging the per-case reductions over the bounded
+cases, the window reduces DRMS by \SI{28}{\percent} relative to the causal EKF
+while removing the divergence mode entirely---the two effects the fixed-lag
+formulation was designed to provide.
 
 \begin{table}[t]
 \caption{Breadth: cold-start cabin magnetometers, DRMS [m]; causal online-TL EKF
-vs.\ \SI{5}{\minute}-window smoother (Huber). ``div.''\ denotes divergence
-beyond \SI{10}{\kilo\meter}.}
+vs.\ \SI{5}{\minute}-window smoother (Huber). ``div.''\ denotes measured divergence
+beyond \SI{10}{\kilo\meter}; ``err.''\ denotes a run that left the map region and
+aborted (no DRMS available; excluded from the 8/9 count).}
 \label{tab:breadth}
 \centering
 \setlength{\tabcolsep}{4pt}
@@ -874,7 +999,7 @@ Flight & Line & Map & Mag & EKF-online & FGO-win \\
 \midrule
 Flt1003 & 1003.02 & E & 4 & div. & \textbf{42.6} \\
 Flt1003 & 1003.02 & E & 5 & 28.1 & \textbf{21.7} \\
-Flt1003 & 1003.08 & R & 4 & div. & \textbf{26.1} \\
+Flt1003 & 1003.08 & R & 4 & err. & \textbf{26.1} \\
 Flt1003 & 1003.08 & R & 5 & 21.1 & \textbf{12.4} \\
 Flt1006 & 1006.08 & E & 4 & div. & \textbf{193.9} \\
 Flt1006 & 1006.08 & E & 5 & \textbf{117.5} & 122.0 \\
@@ -904,16 +1029,24 @@ into a simulated flight (free-inertial reference \SI{31.1}{\meter}) and enable t
 corresponding graph variables cumulatively. Table~\ref{tab:sensor} reports the
 result. With no sensor-error states the estimate is \emph{worse} than free inertial
 (\SI{36.6}{\meter}): the unmodeled error corrupts the map aiding, exactly the
-mechanism of Proposition~\ref{prop:obs}. Enabling the factors drives the error down
-monotonically to \SI{4.8}{\meter}, an \SI{87}{\percent} reduction. The largest gains
-come from the hard-iron bias and the linear drift, which the estimator recovers
-cleanly (drift $\hat{\gamma}_1\!=\!0.019$ versus a true $0.020$). The heading
-harmonics help least: level flight sweeps the sensor--field angle by only about
-\SI{12}{\degree}, so the harmonic regressor is barely excited and its coefficients
-are poorly identified---an observability property of the trajectory, consistent with
-the Remark of Section~\ref{sec:observability}, that a maneuvering flight would
-relieve. The Huber kernel gives essentially the same values (within \SI{0.3}{\meter}),
-as expected for this near-Gaussian simulation.
+mechanism of Proposition~\ref{prop:obs}. Enabling all four factors reduces the
+error to \SI{4.8}{\meter}, an \SI{87}{\percent} reduction. Because the factors are
+enabled cumulatively in a single order, Table~\ref{tab:sensor} attributes marginal
+gains only for that order: the largest single-step drop comes from the heading
+harmonics ($36.6\!\rightarrow\!19.1$\,m), followed by the hard-iron bias and the
+linear drift, whose parameters the estimator recovers cleanly (drift
+$\hat{\gamma}_1\!=\!0.019$ versus a true $0.020$); the dead-zone weight is inert
+here ($+0.1$\,m) because level flight never enters a sensor dead zone. The heading
+coefficients themselves are nonetheless poorly identified: level flight sweeps the
+sensor--field angle by only about \SI{12}{\degree}, so the harmonic regressor is
+barely excited---an observability property of the trajectory, consistent with the
+Remark of Section~\ref{sec:observability}, that a maneuvering flight would relieve.
+The Huber kernel gives essentially the same values (within \SI{0.3}{\meter}), as
+expected for this near-Gaussian simulation. Two caveats bound this study: it is
+simulation-only, and the injected errors share the estimator's functional
+form (exact Fourier, constant, and linear terms), so it demonstrates that the graph
+formulation can carry and recover such states, not that these models capture real
+sensor behavior.
 
 \begin{table}[t]
 \caption{Sensor-error factors (simulation), enabled cumulatively; horizontal DRMS
@@ -1018,7 +1151,7 @@ of which have clear physical interpretations.
 Several limitations bound the present study, and we state them plainly. The
 real-data results are single-run DRMS on five lines; Monte-Carlo statistics over
 initializations and the full SGL line set remain to be run. We compare against a
-causal online-TL EKF and a reproduced online EKF+TL+NN, but not against a
+causal online-TL EKF and a reimplemented online EKF+TL+NN, but not against a
 like-for-like grid or particle-filter map-matching
 baseline~\cite{bergman1999,nordlund2009}, which would sharpen the estimator-structure
 claim. The sensor-error factors are validated in simulation only; a flight
@@ -1032,7 +1165,7 @@ it remains bounded where the causal filter diverges.
 Casting online Tolles--Lawson aeromagnetic compensation as time-varying
 factor-graph variables in a fixed-lag sliding-window smoother yields a
 neural-network-free cold-start calibrator that, on real SGL~2020 data, matches or
-beats a reproduced online EKF+TL+NN on the primary line and generalizes across
+beats a reimplemented online EKF+TL+NN on the primary line and generalizes across
 five lines, three flights, and two maps, remaining bounded where the causal EKF
 diverges. An exact observability condition and its exogeneity corollary explain
 the behavior and guide the choice of compensation features.

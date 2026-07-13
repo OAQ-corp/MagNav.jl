@@ -240,8 +240,10 @@ in overlapping windows of length `win` [s] (overlap `overlap` [s]); each window 
 a batch FGO whose Tolles-Lawson estimate (and its covariance) is carried forward
 as the prior for the next window, so the calibration adapts to time-varying
 platform interference (the FGO analog of an online/adaptive filter, à la iSAM2).
-The navigation error is re-anchored to the INS+map each window; the overlap
-region is used as warm-up and discarded (except the first window).
+Each window commits only its leading stride (window minus overlap); the trailing
+overlap serves as smoother look-ahead for the committed epochs and is re-processed
+by the next window under the carried prior (bounded double-counting of the overlap
+information; the committed means are unaffected).
 
 **Returns:**
 - `filt_res`: `FILTres` stitched filter (smoother) results struct

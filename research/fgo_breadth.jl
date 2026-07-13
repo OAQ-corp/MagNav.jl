@@ -61,7 +61,8 @@ function drms(traj, lat, lon; warm=600.0)
 end
 
 results = DataFrame(flight=Symbol[],line=Float64[],map=Symbol[],mag=String[],
-                    INS=Float64[],EKF_online=Float64[],FGO_win=Float64[],EKF_Mag1=Float64[])
+                    INS=Float64[],EKF_online=Float64[],FGO_win=Float64[],
+                    FGO_win_norobust=Float64[],EKF_Mag1=Float64[])
 
 for (fl,line) in LINES
     xyz   = getxyz(fl)
@@ -105,9 +106,17 @@ for (fl,line) in LINES
             fo  = MagNav.eval_filt(traj,ins,frw)
             fgw = drms(traj,fo.lat,fo.lon)
         catch e; @warn("fgo_online window failed for $fl $line $tag",e) end
+        fgn = NaN  # no-Huber column: isolates the robust kernel from the
+        try        # estimator-structure comparison (red-team defense)
+            frn = fgo_online(ins,mag,flux,itp,zeros(nTL),P0,Qd,R;terms=TERMS,
+                             core=true,win=300.0,overlap=90.0,robust=:none)
+            fn  = MagNav.eval_filt(traj,ins,frn)
+            fgn = drms(traj,fn.lat,fn.lon)
+        catch e; @warn("fgo_online window (no robust) failed for $fl $line $tag",e) end
         push!(results,(fl,line,mname,tag,round(ins_d,digits=1),round(eko,digits=1),
-                       round(fgw,digits=1),round(ekf1,digits=1)))
-        println("  $tag  EKF-online=$(round(eko,digits=1))  FGO-win=$(round(fgw,digits=1)) m")
+                       round(fgw,digits=1),round(fgn,digits=1),round(ekf1,digits=1)))
+        println("  $tag  EKF-online=$(round(eko,digits=1))  FGO-win=$(round(fgw,digits=1))",
+                "  FGO-win(no Huber)=$(round(fgn,digits=1)) m")
     end
 end
 
