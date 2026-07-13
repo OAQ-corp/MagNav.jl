@@ -46,15 +46,13 @@ regime). A recent approach augments an extended Kalman filter (EKF) with online
 Tolles--Lawson (TL) coefficients and a residual neural network. We show that a
 factor-graph formulation reaches the same accuracy without a neural network by
 carrying the TL coefficients as graph variables of a fixed-lag sliding-window
-smoother, so the compensation adapts along the flight. On the primary evaluation
-line of the SGL~2020 dataset the sliding-window smoother beats a reimplemented
-online EKF+TL+NN on both cabin magnetometers and matches, to within fractions of a
-metre, the values reported for that filter. Across five long
-survey lines from three flights and two maps, it improves on a causal online-TL
-EKF on \num{8} of \num{9} cold-start cases and, importantly, remains bounded where
-the causal filter diverges. We also give an exact linear condition for the joint
-observability of compensation and navigation, from which an exogeneity design
-rule for the compensation features follows.
+smoother, so the compensation adapts along the flight. Across five long survey
+lines from three flights and two maps, the smoother is the best of three
+cold-start estimators on \num{9} of \num{10} cases: it stays bounded where a plain
+online-TL EKF diverges, and it beats a reimplemented EKF+TL+NN---which the neural
+network keeps bounded---without using a neural network. We also give an exact
+linear condition for the joint observability of compensation and navigation, from
+which an exogeneity design rule for the compensation features follows.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -982,57 +980,61 @@ and reported EKF+TL+NN (shaded, right).}
 \end{figure}
 
 \subsection{Breadth across lines, flights, and maps}
-Table~\ref{tab:breadth} runs the same cold-start TL model through the causal
-online-TL EKF and the fixed-lag window smoother on five long survey lines spanning
-three flights and two maps. Counting the nine cases in which the EKF returns a
-finite DRMS (the errored run is excluded from the count), the window smoother is
-better on \num{8} of \num{9} (Fig.~\ref{fig:breadth}). On the noisy Mag~4 the
-causal EKF diverges from the cold start to tens of kilometers on three lines, and
-on a fourth it leaves the map region entirely and the run aborts, whereas the
-window smoother stays bounded on all five, because its per-window relinearization
-lets later-observable calibration protect earlier navigation. The lone exception
-is a \SI{14}{\minute} line on which every method is weak, reflecting a
-map-information floor for short lines.
+Table~\ref{tab:breadth} runs the same cold-start TL model on five long survey lines
+spanning three flights and two maps, against \emph{two} causal baselines: the plain
+online-TL EKF, and the reimplemented EKF+TL+NN of Section~\ref{sec:baseline}, the
+strong causal method that a fair comparison demands.
 
-Reading the table by case sharpens the picture. On the three lines where the causal
-EKF diverges with a finite value (1003.02, 1006.08, and 1007.02 on Mag~4), the
-divergence is to $17$--$42\times10^{3}$\,m---the filter has committed to a wrong
-position from which the later, correct calibration cannot recover it---whereas the
-window smoother stays at \SIrange{39}{194}{\meter}; on 1003.08 Mag~4, where the EKF
-ran off the map, the window smoother reaches \SI{26.1}{\meter}. On the
-well-conditioned Mag~5 sensor both estimators are stable and the window still wins
-on four of five lines, by \SIrange{3}{17}{\meter}, the residual benefit of the
-look-ahead. The single case the EKF wins (1006.08 Mag~5, $117.5$ vs
-\SI{122.0}{\meter}, a \SI{4.5}{\meter} gap) is the short line where neither method
-extracts much map information. Averaging the per-case reductions over the bounded
-cases, the window reduces DRMS by \SI{28}{\percent} relative to the causal EKF
-while removing the divergence mode entirely---the two effects the fixed-lag
-formulation was designed to provide.
+The two baselines behave very differently, and the contrast is the point. The
+plain online-TL EKF is fragile: on the noisy Mag~4 it diverges from the cold start
+to tens of kilometres on three lines ($17$--$42\times10^{3}$\,m) and runs off the
+map on a fourth. The neural network fixes exactly this---the EKF+TL+NN stays finite
+on all \num{10} cases, confirming that its residual network is what buys cold-start
+robustness for the causal filter (though on the hard line 1006.08 Mag~4 it only
+just holds, at \SI{1371}{\meter}). \emph{The window smoother matches that
+robustness without any neural network}---it is bounded on all \num{10}---and
+improves on accuracy: it is the best of the three on \num{9} of \num{10} cases
+(Fig.~\ref{fig:breadth}), beating the NN-augmented filter by margins from
+\SI{4}{} to \SI{76}{\meter} and by nearly $7\times$ on 1006.08 Mag~4
+($193.9$ vs \SI{1371}{\meter}). The single loss is again the short line 1006.08
+Mag~5 ($122.0$ vs \SI{34.6}{\meter}), where the map-information floor dominates.
+
+Two honest qualifications. First, the EKF+TL+NN here is our reimplementation; it
+matches the reported 1007.06 operating point to within a few metres
+(Section~\ref{sec:baseline}, Table~\ref{tab:1007}), but the original's per-line
+numbers on the other four lines are not published, so the comparison is against a
+faithful---not the authors'---filter. Second, the network sometimes \emph{hurts}
+on the well-conditioned Mag~5 (e.g.\ 1003.02, $33.8$ vs the plain EKF's
+\SI{28.1}{\meter}): its extra online-learned states add variance where the linear
+TL basis already suffices, whereas the window smoother, carrying only the linear
+compensation, avoids that cost.
 
 \begin{table}[t]
-\caption{Breadth: cold-start cabin magnetometers, DRMS [m]; causal online-TL EKF
-vs.\ \SI{5}{\minute}-window smoother (Huber). ``div.''\ denotes measured divergence
-beyond \SI{10}{\kilo\meter}; ``err.''\ denotes a run that left the map region and
-aborted (no DRMS available; excluded from the 8/9 count).}
+\caption{Breadth: cold-start cabin magnetometers, DRMS [m]. Two causal baselines
+---online-TL EKF (weak) and reimplemented EKF+TL+NN (strong,~\cite{hager2026})
+---vs.\ the NN-free \SI{5}{\minute}-window smoother (Huber). ``div.''\ = measured
+divergence $>\SI{10}{\kilo\meter}$; ``err.''\ = run left the map and aborted.
+Bold = best of the three.}
 \label{tab:breadth}
 \centering
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{llccrr}
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{llcc rrr}
 \toprule
-Flight & Line & Map & Mag & EKF-online & FGO-win \\
+ & & & & EKF & EKF+ & FGO \\
+Flight & Line & Map & Mag & online & TL+NN & win \\
 \midrule
-Flt1003 & 1003.02 & E & 4 & div. & \textbf{42.6} \\
-Flt1003 & 1003.02 & E & 5 & 28.1 & \textbf{21.7} \\
-Flt1003 & 1003.08 & R & 4 & err. & \textbf{26.1} \\
-Flt1003 & 1003.08 & R & 5 & 21.1 & \textbf{12.4} \\
-Flt1006 & 1006.08 & E & 4 & div. & \textbf{193.9} \\
-Flt1006 & 1006.08 & E & 5 & \textbf{117.5} & 122.0 \\
-Flt1007 & 1007.02 & E & 4 & div. & \textbf{38.6} \\
-Flt1007 & 1007.02 & E & 5 & 31.6 & \textbf{14.5} \\
-Flt1007 & 1007.06 & R & 4 & 46.7 & \textbf{32.7} \\
-Flt1007 & 1007.06 & R & 5 & 17.8 & \textbf{13.8} \\
+Flt1003 & 1003.02 & E & 4 & div. & 99.1 & \textbf{42.6} \\
+Flt1003 & 1003.02 & E & 5 & 28.1 & 33.8 & \textbf{21.7} \\
+Flt1003 & 1003.08 & R & 4 & err. & 46.4 & \textbf{26.1} \\
+Flt1003 & 1003.08 & R & 5 & 21.1 & 18.8 & \textbf{12.4} \\
+Flt1006 & 1006.08 & E & 4 & div. & 1371 & \textbf{193.9} \\
+Flt1006 & 1006.08 & E & 5 & 117.5 & \textbf{34.6} & 122.0 \\
+Flt1007 & 1007.02 & E & 4 & div. & 114.8 & \textbf{38.6} \\
+Flt1007 & 1007.02 & E & 5 & 31.6 & 29.3 & \textbf{14.5} \\
+Flt1007 & 1007.06 & R & 4 & 46.7 & 42.2 & \textbf{32.7} \\
+Flt1007 & 1007.06 & R & 5 & 17.8 & 17.8 & \textbf{13.8} \\
 \midrule
-\multicolumn{4}{l}{FGO better} & \multicolumn{2}{r}{\textbf{8 / 9}}\\
+\multicolumn{4}{l}{FGO best of three} & & & \textbf{9 / 10}\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1040,53 +1042,60 @@ Flt1007 & 1007.06 & R & 5 & 17.8 & \textbf{13.8} \\
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.92\columnwidth]{figs/fig_breadth.pdf}
-\caption{Breadth study (Table~\ref{tab:breadth}) on a log DRMS axis. Hatched bars
-mark causal EKF divergence beyond \SI{10}{\kilo\meter}; the fixed-lag window (blue)
-stays bounded throughout.}
+\caption{Breadth study (Table~\ref{tab:breadth}) on a log DRMS axis: weak online-TL
+EKF (gray, hatched where it diverges beyond \SI{10}{\kilo\meter}), strong
+EKF+TL+NN (red), and the NN-free FGO window (blue). The NN keeps the causal filter
+bounded; the window matches that and is best of the three on \num{9} of \num{10}
+cases.}
 \label{fig:breadth}
 \end{figure}
 
 \subsection{Sensor-error factors (simulation)}
-To exercise the sensor-error factors of Section~\ref{sec:method} we inject a known
-heading error ($\SI{8}{\nano\tesla}$ RMS), hard-iron bias, linear drift, and dead-zone noise
-into a simulated flight (free-inertial reference \SI{31.1}{\meter}) and enable the
-corresponding graph variables cumulatively. Table~\ref{tab:sensor} reports the
-result. With no sensor-error states the estimate is \emph{worse} than free inertial
-(\SI{36.6}{\meter}): the unmodeled error corrupts the map aiding, exactly the
-mechanism of Proposition~\ref{prop:obs}. Enabling all four factors reduces the
-error to \SI{4.8}{\meter}, an \SI{87}{\percent} reduction. Because the factors are
-enabled cumulatively in a single order, Table~\ref{tab:sensor} attributes marginal
-gains only for that order: the largest single-step drop comes from the heading
-harmonics ($36.6\!\rightarrow\!19.1$\,m), followed by the hard-iron bias and the
-linear drift, whose parameters the estimator recovers cleanly (drift
-$\hat{\gamma}_1\!=\!0.019$ versus a true $0.020$); the dead-zone weight is inert
-here ($+0.1$\,m) because level flight never enters a sensor dead zone. The heading
-coefficients themselves are nonetheless poorly identified: level flight sweeps the
-sensor--field angle by only about \SI{12}{\degree}, so the harmonic regressor is
-barely excited---an observability property of the trajectory, consistent with the
-Remark of Section~\ref{sec:observability}, that a maneuvering flight would relieve.
-The Huber kernel gives essentially the same values (within \SI{0.3}{\meter}), as
-expected for this near-Gaussian simulation. Two caveats bound this study: it is
-simulation-only, and the injected errors share the estimator's functional
-form (exact Fourier, constant, and linear terms), so it demonstrates that the graph
-formulation can carry and recover such states, not that these models capture real
-sensor behavior.
+To exercise the sensor-error factors of Section~\ref{sec:method} we inject the
+optically-pumped-magnetometer error model of~\cite{hager2026b,wang2020} into a
+simulated flight (free-inertial reference \SI{31.1}{\meter}): a cosine-harmonic
+heading error at orders $\{1,2,4\}$ (\SI{7.6}{\nano\tesla} RMS), a fluxgate
+hard-iron bias, a linear drift, and the equatorial-dead-zone noise amplification
+$1/\max(|\cos\psi|,\epsilon)$. We then enable the corresponding graph variables
+cumulatively; Table~\ref{tab:sensor} reports the result. With no sensor-error
+states the estimate is \emph{worse} than free inertial (\SI{42.9}{\meter}): the
+unmodeled error corrupts the map aiding, exactly the mechanism of
+Proposition~\ref{prop:obs}. Enabling all four factors reduces the error to
+\SI{6.2}{\meter}, an \SI{86}{\percent} reduction, monotone in this order. Because
+the factors are enabled cumulatively in a single order, Table~\ref{tab:sensor}
+attributes marginal gains only for that order: the largest single-step drop comes
+from the heading harmonics ($42.9\!\rightarrow\!18.9$\,m), followed by the
+dead-zone weighting ($\rightarrow\!15.5$\,m, now load-bearing because the injected
+dead-zone noise is heteroscedastic), the hard-iron bias
+($\rightarrow\!8.1$\,m), and the linear drift, whose rate the estimator recovers
+cleanly ($\hat{\gamma}_1\!=\!0.018$ versus a true $0.020$). The heading
+coefficients themselves are poorly identified ($\hat{c}_1\!=\!3.8$ versus a true
+$10$): level flight sweeps the sensor--field angle by only about
+\SI{12}{\degree}, so the harmonic regressor is barely excited---an observability
+property of the trajectory, consistent with the Remark of
+Section~\ref{sec:observability}, that a maneuvering flight would relieve, and the
+gain to navigation comes from the fitted combination over the observed angle
+range, not from the individual coefficients. The Huber kernel gives similar values
+(within \SI{2}{\meter}; it helps most at the dead-zone step). Two caveats bound
+this study: it is simulation-only, and the injected errors share the estimator's
+functional form, so it demonstrates that the graph formulation can carry and
+recover such states, not that these models capture real sensor behavior.
 
 \begin{table}[t]
 \caption{Sensor-error factors (simulation), enabled cumulatively; horizontal DRMS
 [m]. Free-inertial reference \SI{31.1}{\meter}. Values for the non-robust solver;
-the Huber solver agrees within \SI{0.3}{\meter}.}
+the Huber solver agrees within \SI{2}{\meter}.}
 \label{tab:sensor}
 \centering
 \begin{tabular}{lr}
 \toprule
 Graph variables enabled & DRMS \\
 \midrule
-none (map aiding only) & 36.6 \\
-$+$ heading harmonics ($K{=}2$) & 19.1 \\
-$+$ dead-zone weight & 19.2 \\
-$+$ hard-iron bias & 8.4 \\
-\textbf{$+$ linear drift (full)} & \textbf{4.8} \\
+none (map aiding only) & 42.9 \\
+$+$ heading harmonics $\{1,2,4\}$ & 18.9 \\
+$+$ dead-zone weight & 15.5 \\
+$+$ hard-iron bias & 8.1 \\
+\textbf{$+$ linear drift (full)} & \textbf{6.2} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1120,19 +1129,22 @@ calibration then protects earlier navigation. This is the same structural reason
 that batch and incremental smoothers outperform filtering in visual--inertial
 estimation~\cite{forster2017,qin2018}, here applied to the compensation problem.
 
-A consequence worth stating plainly is that \emph{when both estimators converge,
-similar accuracy is expected, and observed}. Both process the same measurements
-under the same models, and the accuracy gain of a fixed-lag smoother over a
-well-tuned filter is bounded by the smoothing gain, which is modest once the
-transient has passed (Mag~5: \SIrange{3}{17}{\meter} in Table~\ref{tab:breadth};
-near-parity with the reported EKF+TL+NN in Table~\ref{tab:1007}). The
-contribution is therefore not steady-state accuracy but \emph{which regimes
-survive}: the causal filter fails outright on four of five Mag~4 cold starts,
-where the window smoother stays bounded, and the smoother reaches its converged
-accuracy without the neural network, its online-training design, or the
-associated verification burden. In operational terms, the window buys the cold
-start, not the cruise. Table~\ref{tab:compare} positions the estimator families
-along the axes that matter for cold-start compensation.
+The breadth study separates two things a single-line comparison conflates:
+robustness and accuracy. Robustness is not unique to the window---the neural
+network also keeps the causal EKF bounded on every cold start
+(Table~\ref{tab:breadth}), so the naive claim that ``causal filters diverge'' is
+false for the state-of-the-art filter. What is distinctive is that the window
+smoother reaches that same bounded regime \emph{without} the network, its
+online-training design, or the associated verification burden, and then improves
+on accuracy: it is best of the three on \num{9} of \num{10} cases. The gain over
+the strong baseline is real but should not be over-read---our EKF+TL+NN is a
+reimplementation, and part of its deficit is that its online-learned states add
+variance on the well-conditioned sensor where the linear TL basis already
+suffices. The defensible summary is that a linear, NN-free estimator, given
+future context through the window, is sufficient to both survive the cold start
+and match or beat an NN-augmented causal filter on this benchmark.
+Table~\ref{tab:compare} positions the estimator families along the axes that
+matter for cold-start compensation.
 
 \begin{table}[t]
 \caption{Estimator families for cold-start map-matching compensation.
@@ -1219,9 +1231,10 @@ baseline~\cite{bergman1999,nordlund2009}, which would sharpen the estimator-stru
 claim. The sensor-error factors are validated in simulation only; a flight
 demonstration with genuine optically-pumped-magnetometer heading error is future
 work. Finally, short lines remain hard for every method, an information limit rather
-than an estimator one. None of these affects the two central, reproducible findings:
-the window smoother matches or beats the NN-augmented filter without a network, and
-it remains bounded where the causal filter diverges.
+than an estimator one. None of these affects the central, reproducible finding: a
+linear, NN-free window smoother is the best of three cold-start estimators on
+\num{9} of \num{10} cases---bounded where the plain causal filter diverges, and
+better than an NN-augmented causal filter without using a network.
 
 \section{Conclusion}\label{sec:conclusion}
 Casting online Tolles--Lawson aeromagnetic compensation as time-varying

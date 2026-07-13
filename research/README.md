@@ -25,7 +25,7 @@ and reproducible simulations.
 | `research/fgo_benchmark.jl` | 181 | real SGL **Flt1003** DRMS benchmark across all methods. |
 | `research/paper_baseline.jl` | — | line 1007.06: our FGO-online (static + sliding-window TL) vs Hager et al. (2026) cited DRMS. |
 | `research/paper_impl.jl` | — | **re-runs** the paper's online EKF+TL+NN (`ekf_online_nn`) cold start on line 1007.06 — a genuine reproduced baseline (Mag 4 40.0 m, Mag 5 17.5 m). |
-| `research/fgo_breadth.jl` | — | **breadth**: window FGO vs causal EKF-online on 5 lines / 3 flights / 2 maps, cold-start cabin mags (§2b) — FGO wins 8/9, immune to the EKF's cold-start divergence. |
+| `research/fgo_breadth.jl` | — | **breadth**: window FGO vs causal EKF-online on 5 lines / 3 flights / 2 maps, cold-start cabin mags (§2b) — FGO best of 3 on 9/10 vs weak (online-TL EKF) + strong (EKF+TL+NN) baselines; NN-free. |
 | `research/fgo_sensor_ablation.jl` | 154 | factorial sensor-error ablation with injected-truth recovery. |
 | `research/fgo_tracks.jl` | 131 | geographic map+track and position-error figures. |
 | `.github/workflows/fgo_research.yml` | — | CI: test suite + all three research scripts on every push. |
@@ -78,24 +78,29 @@ Mag 4 / Mag 5. No neural network anywhere — the only difference is causal EKF 
 batch/window smoothing, so a consistent FGO advantage isolates the factor-graph
 formulation itself. DRMS [m] after a 10-min warm-up (`research/fgo_breadth.jl`):
 
-| flight | line | map | mag | INS | EKF-online | **FGO window** | EKF (Mag 1 comp.) |
-|---|---|---|---|---:|---:|---:|---:|
-| Flt1003 | 1003.02 | Eastern | Mag 4 | 124 | **41626 ✗** | **42.6** | 21.5 |
-| Flt1003 | 1003.02 | Eastern | Mag 5 | 124 | 28.1 | **21.7** | 21.5 |
-| Flt1003 | 1003.08 | Renfrew | Mag 4 | 272 | **diverged ✗** | **26.1** | 17.7 |
-| Flt1003 | 1003.08 | Renfrew | Mag 5 | 272 | 21.1 | **12.4** | 17.7 |
-| Flt1006 | 1006.08 | Eastern | Mag 4 | 198 | **17179 ✗** | 193.9 | 22.3 |
-| Flt1006 | 1006.08 | Eastern | Mag 5 | 198 | 117.5 | 122.0 | 22.3 |
-| Flt1007 | 1007.02 | Eastern | Mag 4 | 121 | **35482 ✗** | **38.6** | 25.6 |
-| Flt1007 | 1007.02 | Eastern | Mag 5 | 121 | 31.6 | **14.5** | 25.6 |
-| Flt1007 | 1007.06 | Renfrew | Mag 4 | 318 | 46.7 | **32.7** | 20.0 |
-| Flt1007 | 1007.06 | Renfrew | Mag 5 | 318 | 17.8 | **13.8** | 20.0 |
+Two causal baselines — weak (online-TL EKF) and strong (reimplemented EKF+TL+NN,
+same recipe as `paper_impl.jl`) — vs the NN-free FGO window. DRMS [m] after a
+10-min warm-up (`research/fgo_breadth.jl`):
 
-**FGO-window beats the causal EKF-online on 8 / 9 cold-start mag-line cases**
-(one EKF run errored off-map). The decisive pattern: on the noisy Mag 4 the causal
-EKF-online **diverges from the cold start to tens of km** (41626 / 35482 / 17179 m)
-on three lines, while the batch/window FGO stays bounded and accurate (42.6 / 38.6
-/ 193.9 m) — the fixed-lag smoother re-linearizes over each window, so early
+| flight | line | map | mag | INS | EKF-online | EKF+TL+NN | **FGO window** |
+|---|---|---|---|---:|---:|---:|---:|
+| Flt1003 | 1003.02 | Eastern | Mag 4 | 124 | **41626 ✗** | 99.1 | **42.6** |
+| Flt1003 | 1003.02 | Eastern | Mag 5 | 124 | 28.1 | 33.8 | **21.7** |
+| Flt1003 | 1003.08 | Renfrew | Mag 4 | 272 | **off-map ✗** | 46.4 | **26.1** |
+| Flt1003 | 1003.08 | Renfrew | Mag 5 | 272 | 21.1 | 18.8 | **12.4** |
+| Flt1006 | 1006.08 | Eastern | Mag 4 | 198 | **17179 ✗** | 1371 | **193.9** |
+| Flt1006 | 1006.08 | Eastern | Mag 5 | 198 | 117.5 | **34.6** | 122.0 |
+| Flt1007 | 1007.02 | Eastern | Mag 4 | 121 | **35482 ✗** | 114.8 | **38.6** |
+| Flt1007 | 1007.02 | Eastern | Mag 5 | 121 | 31.6 | 29.3 | **14.5** |
+| Flt1007 | 1007.06 | Renfrew | Mag 4 | 318 | 46.7 | 42.2 | **32.7** |
+| Flt1007 | 1007.06 | Renfrew | Mag 5 | 318 | 17.8 | 17.8 | **13.8** |
+
+**EKF+TL+NN diverged on 0/10 (the NN keeps the causal filter bounded), yet the
+NN-free FGO window is best of the three on 9/10 cases** (only loss: 1006.08 Mag 5,
+the hard short line). The plain EKF-online **diverges to tens of km** (41626 /
+35482 / 17179 m) on three Mag-4 lines and runs off-map on a fourth, while both the
+NN filter and the FGO window stay bounded — the fixed-lag smoother re-linearizes
+over each window, so early
 navigation is protected by calibration that only becomes observable later, which a
 one-pass causal filter cannot do. FGO even beats the compensated-stinger EKF on
 several lines (e.g. 1003.08 Mag 5 12.4 vs 17.7; 1007.06 Mag 5 13.8 vs 20.0).

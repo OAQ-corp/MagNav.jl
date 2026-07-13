@@ -19,44 +19,48 @@ os.makedirs(OUT, exist_ok=True)
 
 
 def fig_breadth():
-    """Table II as a grouped log-scale bar chart; divergence made explicit."""
-    rows = [  # (label, EKF-online, FGO-win); None -> diverged, "err" -> off-map abort
-        ("1003.02  M4", None, 42.6), ("1003.02  M5", 28.1, 21.7),
-        ("1003.08  M4", "err", 26.1), ("1003.08  M5", 21.1, 12.4),
-        ("1006.08  M4", None, 193.9), ("1006.08  M5", 117.5, 122.0),
-        ("1007.02  M4", None, 38.6), ("1007.02  M5", 31.6, 14.5),
-        ("1007.06  M4", 46.7, 32.7), ("1007.06  M5", 17.8, 13.8),
+    """Table IV as a grouped log-scale bar chart: two causal baselines
+    (weak online-TL EKF, strong EKF+TL+NN) vs the NN-free FGO window."""
+    C_WEAK = "#9aa4b2"   # weak baseline (online-TL EKF), muted gray
+    rows = [  # (label, EKF-online, EKF+TL+NN, FGO-win); None->div, "err"->off-map
+        ("1003.02  M4", None, 99.1, 42.6), ("1003.02  M5", 28.1, 33.8, 21.7),
+        ("1003.08  M4", "err", 46.4, 26.1), ("1003.08  M5", 21.1, 18.8, 12.4),
+        ("1006.08  M4", None, 1371.0, 193.9), ("1006.08  M5", 117.5, 34.6, 122.0),
+        ("1007.02  M4", None, 114.8, 38.6), ("1007.02  M5", 31.6, 29.3, 14.5),
+        ("1007.06  M4", 46.7, 42.2, 32.7), ("1007.06  M5", 17.8, 17.8, 13.8),
     ]
     labels = [r[0] for r in rows]
     y = np.arange(len(rows))[::-1]
-    h = 0.38
-    fig, ax = plt.subplots(figsize=(COL_W, 3.25))
+    h = 0.27
+    fig, ax = plt.subplots(figsize=(COL_W, 3.5))
     DIVX = 3e4
-    for i, (_, ek, fg) in enumerate(rows):
+    for i, (_, ek, nn, fg) in enumerate(rows):
         yy = y[i]
         if ek is None or ek == "err":
-            lab = "  diverged" if ek is None else "  err. (off-map)"
-            ax.barh(yy + h/2, DIVX, height=h, color=C_BASE1, alpha=0.30,
-                    hatch="////", edgecolor=C_BASE1, linewidth=0.6)
-            ax.text(DIVX, yy + h/2, lab, va="center", ha="left",
-                    fontsize=7, color=C_BASE1, style="italic")
+            lab = "diverged" if ek is None else "off-map err."
+            ax.barh(yy + h, DIVX, height=h, color=C_WEAK, alpha=0.35,
+                    hatch="////", edgecolor=C_WEAK, linewidth=0.5)
+            ax.text(DIVX, yy + h, "  " + lab, va="center", ha="left",
+                    fontsize=6.2, color="0.5", style="italic")
         else:
-            ax.barh(yy + h/2, ek, height=h, color=C_BASE1, alpha=0.9,
-                    edgecolor="white", linewidth=0.5)
-        ax.barh(yy - h/2, fg, height=h, color=C_PROPOSED,
-                edgecolor="white", linewidth=0.5)
+            ax.barh(yy + h, ek, height=h, color=C_WEAK, edgecolor="white",
+                    linewidth=0.5)
+        ax.barh(yy, nn, height=h, color=C_BASE1, edgecolor="white", linewidth=0.5)
+        ax.barh(yy - h, fg, height=h, color=C_PROPOSED, edgecolor="white",
+                linewidth=0.5)
     ax.set_yticks(y)
     ax.set_yticklabels(labels)
     ax.set_xscale("log")
     ax.set_xlim(8, 1e5)
     ax.set_xlabel("horizontal DRMS [m]  (log scale)")
     ax.axvline(1e4, color="0.4", lw=0.7, ls=":")
-    ax.text(1e4, len(rows)-0.2, "10 km", fontsize=6.5, color="0.4",
+    ax.text(1e4, len(rows)-0.3, "10 km", fontsize=6.5, color="0.4",
             ha="center", va="bottom")
     ax.grid(True, axis="x", which="major")
-    ax.legend(handles=[Patch(facecolor=C_BASE1, alpha=0.9, label="EKF, online TL (causal)"),
+    ax.legend(handles=[Patch(facecolor=C_WEAK, label="EKF, online TL (weak)"),
+                       Patch(facecolor=C_BASE1, label="EKF+TL+NN (strong)"),
                        Patch(facecolor=C_PROPOSED, label="FGO window (proposed)")],
-              loc="lower right", frameon=False)
+              loc="lower right", frameon=False, fontsize=7)
     despine(ax)
     fig.savefig(os.path.join(OUT, "fig_breadth.pdf"))
     plt.close(fig)
