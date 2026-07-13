@@ -794,21 +794,23 @@ Corollary~\ref{cor:exo} places on our own compensation features.
 All experiments use the public SGL~2020 challenge dataset~\cite{gnadt2020}: a
 Cessna~208B instrumented with a flight-grade INS, several onboard scalar
 magnetometers (a compensated tail-stinger sensor and uncompensated cabin sensors
-Mag~4 and Mag~5), a three-axis fluxgate, and reference truth. We are careful about
-what these flights are: they were flown to characterize aircraft magnetic effects
-and to build anomaly maps, not as operational navigation transits. Flt1003 is
-composed mainly of figure-of-eight trajectories, Flt1007 of more complex
-attitude-varying trajectories that stress the aircraft field, and Flt1006 of
-compensation maneuvers; Flt1004--1005 are the map-building flights, which we do not
-use. Following prior work~\cite{gnadt2020,canciani2017,hager2026}, we evaluate on
-the \emph{designated navigation lines} extracted from these flights (with 1007.06
-the standard comparison line), and we set aside Flt1006's single short line
-(Section~\ref{sec:results}-D). Two consequences follow and we state them plainly.
-First, the maneuver-rich attitude content stresses compensation harder than a
-straight transit would, but it also \emph{aids} TL observability by exciting the
-regressor (Section~\ref{sec:observability}); operational straight-line performance,
-where that excitation is weaker, is therefore not established here and is future
-work. Second, the lines span two altitude regimes---four at the
+Mag~4 and Mag~5, all optically-pumped cesium-vapor units), a three-axis fluxgate,
+and reference truth. The flights serve distinct purposes, and we choose lines
+accordingly. Flt1007 is the \emph{free-flight} mission---the aircraft flies freely
+within the mapped Renfrew ($\approx\!\SI{400}{\meter}$) and Eastern/Perth
+($\approx\!\SI{800}{\meter}$) areas---so its lines are the closest to a navigation
+task and are what prior work~\cite{gnadt2020,canciani2017,hager2026} reports;
+1007.06 is our primary line for that reason. Flt1003 is a crustal-field
+\emph{measurement} flight (survey traverses at \SI{400}{} and \SI{800}{\meter});
+its lines 1003.02 and 1003.08 are straighter than the free-flight legs. Flt1006 is
+a \emph{calibration}-maneuver flight, so we set its single short line aside
+(Section~\ref{sec:results}-D), and the map-building flights (Flt1004--1005) are not
+used. Two honest points remain. First, none of these is a dedicated long,
+straight-and-level operational transit; the free-flight and survey legs carry more
+attitude variation, which stresses compensation but also \emph{aids} TL
+observability by exciting the regressor (Section~\ref{sec:observability}), so
+performance on a pure operational cruise is not directly established here and is
+future work. Second, the lines span two altitude regimes---four at the
 $\approx\!\SI{400}{\meter}$ survey-drape altitude and 1007.02 at
 $\approx\!\SI{800}{\meter}$, where upward continuation attenuates the anomaly.
 Map matching uses the Eastern (``E'') and Renfrew (``R'') high-resolution anomaly
@@ -1267,12 +1269,13 @@ like-for-like grid or particle-filter map-matching
 baseline~\cite{bergman1999,nordlund2009}, which would sharpen the estimator-structure
 claim. The sensor-error factors are validated in simulation only; a flight
 demonstration with genuine optically-pumped-magnetometer heading error is future
-work. Most importantly, the SGL~2020 lines are extracted from
-aircraft-characterization and map-building flights---figure-eights and complex
-maneuvers---rather than operational navigation transits; their attitude content
-both stresses compensation and, through the excitation of the TL regressor, aids
-its observability, so performance on a long straight transit with little attitude
-variation is not established here and is the most important next step. Finally,
+work. Most importantly, although the primary line comes from the free-flight
+mission (Flt1007) and is the community's navigation benchmark, none of the SGL~2020
+lines is a dedicated long, straight-and-level operational transit; their attitude
+content both stresses compensation and, through the excitation of the TL regressor,
+aids its observability, so performance on a pure operational cruise with little
+attitude variation is not directly established here and is the most important next
+step. Finally,
 short lines remain hard for every method, an information limit rather than an
 estimator one. None of these affects the central, reproducible finding: a
 linear, NN-free window smoother is the best of three cold-start estimators on
