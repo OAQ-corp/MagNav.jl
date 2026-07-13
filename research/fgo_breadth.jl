@@ -20,6 +20,8 @@ using LinearAlgebra, Statistics
 using Random: seed!
 seed!(33)
 
+include(joinpath(@__DIR__,"ekf_tlnn.jl"))   # strong causal baseline (EKF+TL+NN)
+
 MEAS_VAR = 12.0^2
 FOGM_SIG = 3.0
 FOGM_TAU = 180.0
@@ -61,8 +63,8 @@ function drms(traj, lat, lon; warm=600.0)
 end
 
 results = DataFrame(flight=Symbol[],line=Float64[],map=Symbol[],mag=String[],
-                    INS=Float64[],EKF_online=Float64[],FGO_win=Float64[],
-                    FGO_win_norobust=Float64[],EKF_Mag1=Float64[])
+                    INS=Float64[],EKF_online=Float64[],EKF_TLNN=Float64[],
+                    FGO_win=Float64[],FGO_win_norobust=Float64[],EKF_Mag1=Float64[])
 
 for (fl,line) in LINES
     xyz   = getxyz(fl)
@@ -99,6 +101,9 @@ for (fl,line) in LINES
                           x0_TL=zeros(nTL),terms=TERMS,core=true,run_crlb=false)
             eko = drms(traj,fo.lat,fo.lon)
         catch e; @warn("ekf_online failed for $fl $line $tag",e) end
+        # strong causal baseline: reimplemented online EKF+TL+NN (Hager 2026),
+        # same recipe as the validated 1007.06 reproduction, on every line
+        enn = ekf_tlnn_drms(traj,ins,mag,flux,itp)
         fgw = NaN
         try
             frw = fgo_online(ins,mag,flux,itp,zeros(nTL),P0,Qd,R;terms=TERMS,
@@ -114,17 +119,27 @@ for (fl,line) in LINES
             fgn = drms(traj,fn.lat,fn.lon)
         catch e; @warn("fgo_online window (no robust) failed for $fl $line $tag",e) end
         push!(results,(fl,line,mname,tag,round(ins_d,digits=1),round(eko,digits=1),
-                       round(fgw,digits=1),round(fgn,digits=1),round(ekf1,digits=1)))
-        println("  $tag  EKF-online=$(round(eko,digits=1))  FGO-win=$(round(fgw,digits=1))",
+                       round(enn,digits=1),round(fgw,digits=1),round(fgn,digits=1),
+                       round(ekf1,digits=1)))
+        println("  $tag  EKF-online=$(round(eko,digits=1))",
+                "  EKF+TL+NN=$(round(enn,digits=1))",
+                "  FGO-win=$(round(fgw,digits=1))",
                 "  FGO-win(no Huber)=$(round(fgn,digits=1)) m")
     end
 end
 
-println("\n=== FGO breadth: window FGO vs causal EKF-online, cold-start cabin mags ===")
+println("\n=== FGO breadth: window FGO vs causal EKF-online vs EKF+TL+NN, cold-start cabin mags ===")
 show(results;allrows=true,allcols=true); println()
 CSV.write(joinpath(@__DIR__,"fgo_breadth_results.csv"),results)
 fin  = filter(r->isfinite(r.EKF_online) && isfinite(r.FGO_win), results)
 wins = sum(fin.FGO_win .< fin.EKF_online)
 println("\nFGO-window beats causal EKF-online on $wins/$(nrow(fin)) mag-line cases",
-        " (same TL model, no neural network) — tests whether the factor-graph",
-        " (batch/window smoothing) advantage generalizes across lines/flights/maps.")
+        " (same TL model, no neural network).")
+# strong-baseline comparison: how often does the reimplemented EKF+TL+NN diverge,
+# and how does FGO (NN-free) compare where the NN filter stays bounded?
+finn = filter(r->isfinite(r.EKF_TLNN) && isfinite(r.FGO_win), results)
+nn_div = sum(.!isfinite.(results.EKF_TLNN))
+nn_wins = nrow(finn) == 0 ? 0 : sum(finn.FGO_win .< finn.EKF_TLNN)
+println("EKF+TL+NN diverged on $nn_div/$(nrow(results)) cases; ",
+        "where both finite, FGO better on $nn_wins/$(nrow(finn)) ",
+        "(NN-free vs the strong causal baseline).")
