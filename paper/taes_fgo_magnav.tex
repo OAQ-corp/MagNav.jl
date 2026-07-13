@@ -46,9 +46,10 @@ regime). A recent approach augments an extended Kalman filter (EKF) with online
 Tolles--Lawson (TL) coefficients and a residual neural network. We show that a
 factor-graph formulation reaches the same accuracy without a neural network by
 carrying the TL coefficients as graph variables of a fixed-lag sliding-window
-smoother, so the compensation adapts along the flight. Across five long survey
-lines from three flights and two maps, the smoother is the best of three
-cold-start estimators on every full-length line (\num{8} of \num{8} cases): it stays bounded where a plain
+smoother, so the compensation adapts along the flight. Across five long lines from
+three flights and two maps---spanning free-flight navigation, survey, and
+calibration missions---the smoother is the best of three
+cold-start estimators on every full-length navigation and survey line (\num{8} of \num{8} cases): it stays bounded where a plain
 online-TL EKF diverges, and it beats a reimplemented EKF+TL+NN---which the neural
 network keeps bounded---without using a neural network. We also give an exact
 linear condition for the joint observability of compensation and navigation, from
@@ -935,9 +936,13 @@ Gauss--Newton & max.\ iter.\ / tol. & 5 / $10^{-4}$ \\
 \end{table}
 
 \subsection{Batch estimator on real data}
-We first validate the estimator on line 1003.02 (Flt1003, \SI{63}{\minute}) with the
-compensated stinger magnetometer, where the interference is already removed and the
-comparison isolates the estimator. The batch factor graph improves horizontal DRMS
+We first validate the estimator on \emph{survey} line 1003.02---from the
+crustal-field measurement flight Flt1003 (\SI{63}{\minute})---with the compensated
+stinger magnetometer. This is a deliberately controlled check rather than the
+navigation demonstration: because the interference is already removed, the
+comparison isolates the estimator and solver from the cold-start compensation
+problem; the navigation showcase proper is the free-flight line 1007.06 of
+Section~\ref{sec:results}-C. The batch factor graph improves horizontal DRMS
 from the EKF's \SI{28.3}{\meter} to \SI{14.0}{\meter} (Huber kernel), against
 \SI{114.6}{\meter} free-inertial---a \SI{51}{\percent} reduction over the EKF.
 Fig.~\ref{fig:map} shows the anomaly map and the flight line, with a zoom on the
@@ -958,9 +963,10 @@ Gaussian; its value appears in the cold-start cases below, where transient outli
 are large.
 
 \begin{table}[t]
-\caption{Batch estimator on line 1003.02 (compensated stinger); horizontal DRMS
-[m]. Free-inertial reference \SI{114.6}{\meter}. The RTS and GN/QR solvers agree,
-confirming a common MAP estimate.}
+\caption{Batch estimator on survey line 1003.02 (Flt1003 measurement flight,
+compensated stinger)---a controlled estimator/solver check, not the navigation
+result; horizontal DRMS [m]. Free-inertial reference \SI{114.6}{\meter}. The RTS
+and GN/QR solvers agree, confirming a common MAP estimate.}
 \label{tab:bench}
 \centering
 \begin{tabular}{llr}
@@ -982,9 +988,9 @@ full line & \textbf{FGO (RTS, Huber)} & \textbf{14.0} \\
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\columnwidth]{figs/fig_map.pdf}
-\caption{Eastern anomaly map and flight line 1003.02, providing geographic
-context; the inset zooms the fine anomaly structure the map-matching factor
-exploits along the line. The estimator comparison is deferred to
+\caption{Eastern anomaly map and survey line 1003.02 (Flt1003 measurement flight),
+providing geographic context; the inset zooms the fine anomaly structure the
+map-matching factor exploits along the line. The estimator comparison is deferred to
 Figs.~\ref{fig:poserr}--\ref{fig:cdf}: at the survey ground speed a
 metre-level track error is smaller than one \SI{12}{\second} sample and cannot
 be resolved on a map.}
@@ -994,8 +1000,9 @@ be resolved on a map.}
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\columnwidth]{figs/fig_poserr.pdf}
-\caption{Horizontal position error on line 1003.02. The batch factor graph (FGO,
-blue) holds a tighter bound than the EKF (red) across the line; the shaded band
+\caption{Horizontal position error on survey line 1003.02 (Flt1003). The batch
+factor graph (FGO, blue) holds a tighter bound than the EKF (red) across the line;
+the shaded band
 marks the FGO improvement, and free inertial (INS) diverges. The labelled DRMS
 values are computed over the full line, without the warm-up exclusion of
 Table~\ref{tab:bench}.}
@@ -1005,8 +1012,9 @@ Table~\ref{tab:bench}.}
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\columnwidth]{figs/fig_cdf.pdf}
-\caption{Empirical CDF of horizontal error on line 1003.02 (full line, as in
-Fig.~\ref{fig:poserr}). The proposed FGO reaches its 95th percentile at less than
+\caption{Empirical CDF of horizontal error on survey line 1003.02 (Flt1003; full
+line, as in Fig.~\ref{fig:poserr}). The proposed FGO reaches its 95th percentile at
+less than
 half the EKF's error; both bound the free-inertial error by an order of magnitude.}
 \label{fig:cdf}
 \end{figure}
@@ -1044,15 +1052,17 @@ the balance can shift toward longer windows) is left for the revision.
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.92\columnwidth]{figs/fig_winlen.pdf}
-\caption{Window length versus accuracy on line 1007.06 (cold start), at the
-three evaluated lengths. The \SI{5}{\minute} window balances the
+\caption{Window length versus accuracy on the free-flight navigation line 1007.06
+(Flt1007, cold start), at the three evaluated lengths. The \SI{5}{\minute} window
+balances the
 under-determined \SI{2}{\minute} window against the drift-blind static batch
 (full line).}
 \label{fig:winlen}
 \end{figure}
 
 \begin{table}[t]
-\caption{Cold start, line 1007.06, uncompensated cabin magnetometers; DRMS [m].
+\caption{Cold start on the free-flight navigation line 1007.06 (Flt1007),
+uncompensated cabin magnetometers; DRMS [m]. This is the primary navigation result.
 INS \SI{318}{\meter}; EKF on compensated Mag~1 $\approx\SI{20}{\meter}$.}
 \label{tab:1007}
 \centering
@@ -1075,15 +1085,17 @@ EKF+TL-only, reported~\cite{hager2026} & 58 & 15 \\
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\columnwidth]{figs/fig_coldstart.pdf}
-\caption{Line 1007.06 cold start on the uncompensated cabin magnetometers. The
-NN-free fixed-lag window (left of the divider) compares against the reimplemented
-and reported EKF+TL+NN (shaded, right).}
+\caption{Free-flight navigation line 1007.06 (Flt1007), cold start on the
+uncompensated cabin magnetometers. The NN-free fixed-lag window (left of the
+divider) compares against the reimplemented and reported EKF+TL+NN (shaded, right).}
 \label{fig:coldstart}
 \end{figure}
 
 \subsection{Breadth across lines, flights, and maps}
-Table~\ref{tab:breadth} runs the same cold-start TL model on five long survey lines
-spanning three flights and two maps, against \emph{two} causal baselines: the plain
+Table~\ref{tab:breadth} runs the same cold-start TL model on five long lines
+spanning three flights and two maps---free-flight navigation legs (Flt1007),
+survey traverses (Flt1003), and a calibration-maneuver line (Flt1006), grouped by
+purpose---against \emph{two} causal baselines: the plain
 online-TL EKF, and the reimplemented EKF+TL+NN of Section~\ref{sec:baseline}, the
 strong causal method that a fair comparison demands.
 
