@@ -22,18 +22,18 @@ def fig_breadth():
     """Table IV as a grouped log-scale bar chart: two causal baselines
     (weak online-TL EKF, strong EKF+TL+NN) vs the NN-free FGO window."""
     C_WEAK = "#9aa4b2"   # weak baseline (online-TL EKF), muted gray
-    rows = [  # ordered by nav-usability: FF first, SV next, CAL last (excluded)
+    rows = [  # the four counted lines: FF (Flt1007) then SV (Flt1003).
+        # The calibration line 1006.08 is set aside (see text) and not shown.
         # (label, EKF-online, EKF+TL+NN, FGO-win); None->div, "err"->off-map
         ("1007.06  M4  (FF)", 46.7, 42.2, 32.7), ("1007.06  M5  (FF)", 17.8, 17.8, 13.8),
         ("1007.02  M4  (FF)", None, 114.8, 38.6), ("1007.02  M5  (FF)", 31.6, 29.3, 14.5),
         ("1003.02  M4  (SV)", None, 99.1, 42.6), ("1003.02  M5  (SV)", 28.1, 33.8, 21.7),
         ("1003.08  M4  (SV)", "err", 46.4, 26.1), ("1003.08  M5  (SV)", 21.1, 18.8, 12.4),
-        ("1006.08  M4  (cal.)", None, 1371.0, 193.9), ("1006.08  M5  (cal.)", 117.5, 34.6, 122.0),
     ]
     labels = [r[0] for r in rows]
     y = np.arange(len(rows))[::-1]
     h = 0.27
-    fig, ax = plt.subplots(figsize=(COL_W, 3.5))
+    fig, ax = plt.subplots(figsize=(COL_W, 2.95))
     DIVX = 3e4
     for i, (_, ek, nn, fg) in enumerate(rows):
         yy = y[i]

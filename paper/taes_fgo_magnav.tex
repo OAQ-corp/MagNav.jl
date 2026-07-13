@@ -46,10 +46,10 @@ regime). A recent approach augments an extended Kalman filter (EKF) with online
 Tolles--Lawson (TL) coefficients and a residual neural network. We show that a
 factor-graph formulation reaches the same accuracy without a neural network by
 carrying the TL coefficients as graph variables of a fixed-lag sliding-window
-smoother, so the compensation adapts along the flight. Across five long lines from
-three flights and two maps---spanning free-flight navigation, survey, and
-calibration missions---the smoother is the best of three
-cold-start estimators on every full-length navigation and survey line (\num{8} of \num{8} cases): it stays bounded where a plain
+smoother, so the compensation adapts along the flight. Across four long lines from
+two flights and two maps---spanning free-flight navigation and survey
+missions---the smoother is the best of three
+cold-start estimators on every full-length line (\num{8} of \num{8} cases): it stays bounded where a plain
 online-TL EKF diverges, and it beats a reimplemented EKF+TL+NN---which the neural
 network keeps bounded---without using a neural network. We also give an exact
 linear condition for the joint observability of compensation and navigation, from
@@ -270,7 +270,7 @@ The paper makes the following contributions:
   \item \textbf{Reimplemented baseline and multi-line breadth study.} We
         reimplement---rather than merely cite---the online EKF+TL+NN result of
         \cite{hager2026} and place it head-to-head with the proposed smoother and a
-        weak online-TL EKF on ten cold-start cases spanning five long lines, three
+        weak online-TL EKF on eight cold-start cases spanning four long lines, two
         flights, and two anomaly maps. The study isolates exactly what the neural
         network buys (it keeps the causal filter bounded where online TL alone
         diverges) and what it does not (on every full-length navigation line the
@@ -1092,32 +1092,31 @@ divider) compares against the reimplemented and reported EKF+TL+NN (shaded, righ
 \end{figure}
 
 \subsection{Breadth across lines, flights, and maps}
-Table~\ref{tab:breadth} runs the same cold-start TL model on five long lines
-spanning three flights and two maps---free-flight navigation legs (Flt1007),
-survey traverses (Flt1003), and a calibration-maneuver line (Flt1006), grouped by
-purpose---against \emph{two} causal baselines: the plain
-online-TL EKF, and the reimplemented EKF+TL+NN of Section~\ref{sec:baseline}, the
-strong causal method that a fair comparison demands.
+Table~\ref{tab:breadth} runs the same cold-start TL model on four long lines
+spanning two flights and two maps---free-flight navigation legs (Flt1007) and
+survey traverses (Flt1003), grouped by purpose---against \emph{two} causal
+baselines: the plain online-TL EKF, and the reimplemented EKF+TL+NN of
+Section~\ref{sec:baseline}, the strong causal method that a fair comparison demands.
 
 The two baselines behave very differently, and the contrast is the point. The
 plain online-TL EKF is fragile: on the noisy Mag~4 it diverges from the cold start
-to tens of kilometres on three lines ($17$--$42\times10^{3}$\,m) and runs off the
-map on a fourth. The neural network fixes exactly this---the EKF+TL+NN stays finite
-on all \num{10} cases, confirming that its residual network is what buys cold-start
-robustness for the causal filter. \emph{The window smoother matches that robustness
-without any neural network}---it is bounded on all \num{10}---and improves on
-accuracy: on the four full-length lines (\SIrange{63}{87}{\minute}, eight
-mag-cases) it is the best of the three on \emph{all eight}, beating the
-NN-augmented filter by \SIrange{4}{76}{\meter} (Fig.~\ref{fig:breadth}). The fifth
-line, 1006.08, is from a compensation-maneuver flight and is only
-\SI{14}{\minute} long, so the \SI{10}{\minute} warm-up leaves a \SI{4}{\minute}
-evaluation window over which none of the three DRMS values is reliable; we retain
-it in Table~\ref{tab:breadth} because it still exhibits the
-causal-EKF divergence ($1.7\times10^{4}$\,m on Mag~4) and the map-information floor
-that makes every method weak, but we exclude its two cases from the count and draw
-no accuracy conclusion from its ordering (which is why the NN's \SI{34.6}{\meter}
-on Mag~5, against $117$--\SI{122}{\meter} for the TL-only methods, is not evidence
-of an NN accuracy advantage).
+to tens of kilometres on two lines and runs off the map on a third. The neural
+network fixes exactly this---the EKF+TL+NN stays finite on all eight cases,
+confirming that its residual network is what buys cold-start robustness for the
+causal filter. \emph{The window smoother matches that robustness without any neural
+network}---it is bounded on all eight---and improves on accuracy: across the four
+full-length lines (\SIrange{63}{87}{\minute}, eight mag-cases) it is the best of the
+three on \emph{all eight}, beating the NN-augmented filter by
+\SIrange{4}{76}{\meter} (Fig.~\ref{fig:breadth}).
+
+We also ran the short calibration-maneuver line 1006.08 (Flt1006) but set it aside
+rather than tabulate it: it is only \SI{14}{\minute} long, so the \SI{10}{\minute}
+warm-up leaves a \SI{4}{\minute} window over which none of the three DRMS values is
+reliable, and its low map-information floor (Section~\ref{sec:discussion}-C) makes
+every method weak. It reproduces the same causal-EKF divergence, but we draw no
+accuracy conclusion from it---in particular the NN's \SI{34.6}{\meter} on its Mag~5,
+against \SIrange{117}{122}{\meter} for the TL-only methods, is not evidence of an NN
+accuracy advantage on a window this short.
 
 Two effects in the reliable cases are worth naming. First, the EKF+TL+NN follows
 the reproduced design in feeding the network only the \emph{permanent} TL group,
@@ -1138,11 +1137,9 @@ authors'---filter.
 \begin{table}[t]
 \caption{Breadth: cold-start cabin magnetometers, DRMS [m], on the SGL~2020
 navigation-usable lines. ``Purpose'': FF = free-flight (Flt1007), SV = survey
-traverse (Flt1003), CAL = calibration-maneuver flight (Flt1006). ``div.''\ =
-divergence $>\SI{10}{\kilo\meter}$; ``err.''\ = run left the map. Bold = best of
-the three baselines. The calibration line 1006.08 ($\dagger$) is only
-\SI{14}{\minute} (a \SI{4}{\minute} window after warm-up), unreliable and excluded
-from the count.}
+traverse (Flt1003). ``div.''\ = divergence $>\SI{10}{\kilo\meter}$; ``err.''\ = run
+left the map. Bold = best of the three baselines. The short calibration-maneuver
+line 1006.08 (Flt1006) is set aside and not tabulated (see text).}
 \label{tab:breadth}
 \centering
 \setlength{\tabcolsep}{3pt}
@@ -1160,11 +1157,7 @@ Line & Purp. & Map & [km] & Mag & online & TL+NN & win \\
 1003.08 & SV & R & 0.4 & 4 & err. & 46.4 & \textbf{26.1} \\
 1003.08 & SV & R & 0.4 & 5 & 21.1 & 18.8 & \textbf{12.4} \\
 \midrule
-\multicolumn{8}{l}{\footnotesize\emph{calibration flight ($\dagger$, excluded from count):}}\\
-1006.08$^\dagger$ & CAL & E & 0.4 & 4 & div. & 1371 & 193.9 \\
-1006.08$^\dagger$ & CAL & E & 0.4 & 5 & 117.5 & 34.6 & 122.0 \\
-\midrule
-\multicolumn{5}{l}{FGO best (navigation lines)} & & & \textbf{8 / 8}\\
+\multicolumn{5}{l}{FGO best (all counted lines)} & & & \textbf{8 / 8}\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1176,8 +1169,7 @@ Line & Purp. & Map & [km] & Mag & online & TL+NN & win \\
 EKF (gray, hatched where it diverges beyond \SI{10}{\kilo\meter}), strong
 EKF+TL+NN (red), and the NN-free FGO window (blue). The NN keeps the causal filter
 bounded; the window matches that and is best of the three on all \num{8} full-length
-cases (the \SI{14}{\minute} line 1006.08 is excluded as its post-warm-up window
-is too short to compare).}
+cases. The short calibration line 1006.08 is set aside and not shown (see text).}
 \label{fig:breadth}
 \end{figure}
 
@@ -1349,7 +1341,7 @@ of which have clear physical interpretations.
 
 \subsection{Limitations}
 Several limitations bound the present study, and we state them plainly. The
-real-data results are single-run DRMS on five lines; Monte-Carlo statistics over
+real-data results are single-run DRMS on four lines; Monte-Carlo statistics over
 initializations and the full SGL line set remain to be run. We compare against a
 causal online-TL EKF and a reimplemented online EKF+TL+NN, but not against a
 like-for-like grid or particle-filter map-matching
@@ -1374,7 +1366,7 @@ Casting online Tolles--Lawson aeromagnetic compensation as time-varying
 factor-graph variables in a fixed-lag sliding-window smoother yields a
 neural-network-free cold-start calibrator that, on real SGL~2020 data, matches or
 beats a reimplemented online EKF+TL+NN on the primary line and generalizes across
-five lines, three flights, and two maps, remaining bounded where the causal EKF
+four lines, two flights, and two maps, remaining bounded where the causal EKF
 diverges. An exact observability condition and its exogeneity corollary explain
 the behavior and guide the choice of compensation features.
 
