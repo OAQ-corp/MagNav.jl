@@ -1041,37 +1041,35 @@ lines are unpublished, so the comparison is against a faithful---not the
 authors'---filter.
 
 \begin{table}[t]
-\caption{Breadth: cold-start cabin magnetometers, DRMS [m]. Two causal baselines
----online-TL EKF (weak) and reimplemented EKF+TL+NN (strong,~\cite{hager2026})
----vs.\ the NN-free \SI{5}{\minute}-window smoother (Huber). ``div.''\ = measured
-divergence $>\SI{10}{\kilo\meter}$; ``err.''\ = run left the map and aborted.
-Bold = best of the three. Line 1006.08 ($\dagger$) is from a compensation-maneuver
-flight and is only \SI{14}{\minute} long (a \SI{4}{\minute} window after warm-up);
-its DRMS values are unreliable and excluded from the count. Line 1007.02
-($\ddagger$) is a $\approx\!\SI{800}{\meter}$ high-altitude line (weaker anomaly);
-the others are at the $\approx\!\SI{400}{\meter}$ survey-drape altitude.}
+\caption{Breadth: cold-start cabin magnetometers, DRMS [m], on the SGL~2020
+navigation-usable lines. ``Purpose'': FF = free-flight (Flt1007), SV = survey
+traverse (Flt1003), CAL = calibration-maneuver flight (Flt1006). ``div.''\ =
+divergence $>\SI{10}{\kilo\meter}$; ``err.''\ = run left the map. Bold = best of
+the three baselines. The calibration line 1006.08 ($\dagger$) is only
+\SI{14}{\minute} (a \SI{4}{\minute} window after warm-up), unreliable and excluded
+from the count.}
 \label{tab:breadth}
 \centering
-\setlength{\tabcolsep}{3.5pt}
-\begin{tabular}{llcc rrr}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{llccc rrr}
 \toprule
- & & & & EKF & EKF+ & FGO \\
-Flight & Line & Map & Mag & online & TL+NN & win \\
+ & & & alt & & EKF & EKF+ & FGO \\
+Line & Purp. & Map & [km] & Mag & online & TL+NN & win \\
 \midrule
-Flt1003 & 1003.02 & E & 4 & div. & 99.1 & \textbf{42.6} \\
-Flt1003 & 1003.02 & E & 5 & 28.1 & 33.8 & \textbf{21.7} \\
-Flt1003 & 1003.08 & R & 4 & err. & 46.4 & \textbf{26.1} \\
-Flt1003 & 1003.08 & R & 5 & 21.1 & 18.8 & \textbf{12.4} \\
-Flt1007 & 1007.02$^\ddagger$ & E & 4 & div. & 114.8 & \textbf{38.6} \\
-Flt1007 & 1007.02$^\ddagger$ & E & 5 & 31.6 & 29.3 & \textbf{14.5} \\
-Flt1007 & 1007.06 & R & 4 & 46.7 & 42.2 & \textbf{32.7} \\
-Flt1007 & 1007.06 & R & 5 & 17.8 & 17.8 & \textbf{13.8} \\
+1007.06 & FF & R & 0.4 & 4 & 46.7 & 42.2 & \textbf{32.7} \\
+1007.06 & FF & R & 0.4 & 5 & 17.8 & 17.8 & \textbf{13.8} \\
+1007.02 & FF & E & 0.8 & 4 & div. & 114.8 & \textbf{38.6} \\
+1007.02 & FF & E & 0.8 & 5 & 31.6 & 29.3 & \textbf{14.5} \\
+1003.02 & SV & E & 0.4 & 4 & div. & 99.1 & \textbf{42.6} \\
+1003.02 & SV & E & 0.4 & 5 & 28.1 & 33.8 & \textbf{21.7} \\
+1003.08 & SV & R & 0.4 & 4 & err. & 46.4 & \textbf{26.1} \\
+1003.08 & SV & R & 0.4 & 5 & 21.1 & 18.8 & \textbf{12.4} \\
 \midrule
-\multicolumn{7}{l}{\footnotesize\emph{short line ($\dagger$, excluded from count):}}\\
-Flt1006$^\dagger$ & 1006.08 & E & 4 & div. & 1371 & 193.9 \\
-Flt1006$^\dagger$ & 1006.08 & E & 5 & 117.5 & 34.6 & 122.0 \\
+\multicolumn{8}{l}{\footnotesize\emph{calibration flight ($\dagger$, excluded from count):}}\\
+1006.08$^\dagger$ & CAL & E & 0.4 & 4 & div. & 1371 & 193.9 \\
+1006.08$^\dagger$ & CAL & E & 0.4 & 5 & 117.5 & 34.6 & 122.0 \\
 \midrule
-\multicolumn{4}{l}{FGO best (full-length lines)} & & & \textbf{8 / 8}\\
+\multicolumn{5}{l}{FGO best (navigation lines)} & & & \textbf{8 / 8}\\
 \bottomrule
 \end{tabular}
 \end{table}
