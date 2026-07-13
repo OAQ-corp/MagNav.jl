@@ -48,7 +48,7 @@ factor-graph formulation reaches the same accuracy without a neural network by
 carrying the TL coefficients as graph variables of a fixed-lag sliding-window
 smoother, so the compensation adapts along the flight. Across five long survey
 lines from three flights and two maps, the smoother is the best of three
-cold-start estimators on \num{9} of \num{10} cases: it stays bounded where a plain
+cold-start estimators on every full-length line (\num{8} of \num{8} cases): it stays bounded where a plain
 online-TL EKF diverges, and it beats a reimplemented EKF+TL+NN---which the neural
 network keeps bounded---without using a neural network. We also give an exact
 linear condition for the joint observability of compensation and navigation, from
@@ -990,31 +990,44 @@ plain online-TL EKF is fragile: on the noisy Mag~4 it diverges from the cold sta
 to tens of kilometres on three lines ($17$--$42\times10^{3}$\,m) and runs off the
 map on a fourth. The neural network fixes exactly this---the EKF+TL+NN stays finite
 on all \num{10} cases, confirming that its residual network is what buys cold-start
-robustness for the causal filter (though on the hard line 1006.08 Mag~4 it only
-just holds, at \SI{1371}{\meter}). \emph{The window smoother matches that
-robustness without any neural network}---it is bounded on all \num{10}---and
-improves on accuracy: it is the best of the three on \num{9} of \num{10} cases
-(Fig.~\ref{fig:breadth}), beating the NN-augmented filter by margins from
-\SI{4}{} to \SI{76}{\meter} and by nearly $7\times$ on 1006.08 Mag~4
-($193.9$ vs \SI{1371}{\meter}). The single loss is again the short line 1006.08
-Mag~5 ($122.0$ vs \SI{34.6}{\meter}), where the map-information floor dominates.
+robustness for the causal filter. \emph{The window smoother matches that robustness
+without any neural network}---it is bounded on all \num{10}---and improves on
+accuracy: on the four full-length lines (\SIrange{63}{87}{\minute}, eight
+mag-cases) it is the best of the three on \emph{all eight}, beating the
+NN-augmented filter by \SIrange{4}{76}{\meter} (Fig.~\ref{fig:breadth}). The fifth
+line, 1006.08, is only \SI{14}{\minute} long, so the \SI{10}{\minute} warm-up
+leaves a \SI{4}{\minute} evaluation window over which none of the three DRMS values
+is reliable; we retain it in Table~\ref{tab:breadth} because it still exhibits the
+causal-EKF divergence ($1.7\times10^{4}$\,m on Mag~4) and the map-information floor
+that makes every method weak, but we exclude its two cases from the count and draw
+no accuracy conclusion from its ordering (which is why the NN's \SI{34.6}{\meter}
+on Mag~5, against $117$--\SI{122}{\meter} for the TL-only methods, is not evidence
+of an NN accuracy advantage).
 
-Two honest qualifications. First, the EKF+TL+NN here is our reimplementation; it
-matches the reported 1007.06 operating point to within a few metres
-(Section~\ref{sec:baseline}, Table~\ref{tab:1007}), but the original's per-line
-numbers on the other four lines are not published, so the comparison is against a
-faithful---not the authors'---filter. Second, the network sometimes \emph{hurts}
-on the well-conditioned Mag~5 (e.g.\ 1003.02, $33.8$ vs the plain EKF's
-\SI{28.1}{\meter}): its extra online-learned states add variance where the linear
-TL basis already suffices, whereas the window smoother, carrying only the linear
-compensation, avoids that cost.
+Two effects in the reliable cases are worth naming. First, the EKF+TL+NN follows
+the reproduced design in feeding the network only the \emph{permanent} TL group,
+whereas the online-TL EKF and the window smoother both carry the full
+permanent-induced-eddy-bias basis; on the well-conditioned Mag~5 those linear
+higher-order terms matter, so the NN filter can fall \emph{behind even the plain
+EKF} (1003.02: $33.8$ vs \SI{28.1}{\meter}) when its network has not yet learned
+what the dropped linear terms would have supplied directly. Second, and relatedly,
+the network's extra online-learned states add estimation variance where the linear
+basis already suffices, a cost the NN-free window avoids. Both effects favor a
+linear compensation carried in a smoother over a learned one carried in a filter,
+on this benchmark. One caveat on provenance: the EKF+TL+NN is our reimplementation,
+matching the reported 1007.06 operating point to within a few metres
+(Section~\ref{sec:baseline}), but the original's per-line numbers on the other
+lines are unpublished, so the comparison is against a faithful---not the
+authors'---filter.
 
 \begin{table}[t]
 \caption{Breadth: cold-start cabin magnetometers, DRMS [m]. Two causal baselines
 ---online-TL EKF (weak) and reimplemented EKF+TL+NN (strong,~\cite{hager2026})
 ---vs.\ the NN-free \SI{5}{\minute}-window smoother (Huber). ``div.''\ = measured
 divergence $>\SI{10}{\kilo\meter}$; ``err.''\ = run left the map and aborted.
-Bold = best of the three.}
+Bold = best of the three. Line 1006.08 ($\dagger$) is only \SI{14}{\minute} long,
+leaving a \SI{4}{\minute} window after warm-up; its DRMS values are unreliable and
+excluded from the count.}
 \label{tab:breadth}
 \centering
 \setlength{\tabcolsep}{3.5pt}
@@ -1027,14 +1040,16 @@ Flt1003 & 1003.02 & E & 4 & div. & 99.1 & \textbf{42.6} \\
 Flt1003 & 1003.02 & E & 5 & 28.1 & 33.8 & \textbf{21.7} \\
 Flt1003 & 1003.08 & R & 4 & err. & 46.4 & \textbf{26.1} \\
 Flt1003 & 1003.08 & R & 5 & 21.1 & 18.8 & \textbf{12.4} \\
-Flt1006 & 1006.08 & E & 4 & div. & 1371 & \textbf{193.9} \\
-Flt1006 & 1006.08 & E & 5 & 117.5 & \textbf{34.6} & 122.0 \\
 Flt1007 & 1007.02 & E & 4 & div. & 114.8 & \textbf{38.6} \\
 Flt1007 & 1007.02 & E & 5 & 31.6 & 29.3 & \textbf{14.5} \\
 Flt1007 & 1007.06 & R & 4 & 46.7 & 42.2 & \textbf{32.7} \\
 Flt1007 & 1007.06 & R & 5 & 17.8 & 17.8 & \textbf{13.8} \\
 \midrule
-\multicolumn{4}{l}{FGO best of three} & & & \textbf{9 / 10}\\
+\multicolumn{7}{l}{\footnotesize\emph{short line ($\dagger$, excluded from count):}}\\
+Flt1006$^\dagger$ & 1006.08 & E & 4 & div. & 1371 & 193.9 \\
+Flt1006$^\dagger$ & 1006.08 & E & 5 & 117.5 & 34.6 & 122.0 \\
+\midrule
+\multicolumn{4}{l}{FGO best (full-length lines)} & & & \textbf{8 / 8}\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1045,8 +1060,9 @@ Flt1007 & 1007.06 & R & 5 & 17.8 & 17.8 & \textbf{13.8} \\
 \caption{Breadth study (Table~\ref{tab:breadth}) on a log DRMS axis: weak online-TL
 EKF (gray, hatched where it diverges beyond \SI{10}{\kilo\meter}), strong
 EKF+TL+NN (red), and the NN-free FGO window (blue). The NN keeps the causal filter
-bounded; the window matches that and is best of the three on \num{9} of \num{10}
-cases.}
+bounded; the window matches that and is best of the three on all \num{8} full-length
+cases (the \SI{14}{\minute} line 1006.08 is excluded as its post-warm-up window
+is too short to compare).}
 \label{fig:breadth}
 \end{figure}
 
@@ -1136,7 +1152,7 @@ network also keeps the causal EKF bounded on every cold start
 false for the state-of-the-art filter. What is distinctive is that the window
 smoother reaches that same bounded regime \emph{without} the network, its
 online-training design, or the associated verification burden, and then improves
-on accuracy: it is best of the three on \num{9} of \num{10} cases. The gain over
+on accuracy: it is best of the three on all \num{8} full-length cases. The gain over
 the strong baseline is real but should not be over-read---our EKF+TL+NN is a
 reimplementation, and part of its deficit is that its online-learned states add
 variance on the well-conditioned sensor where the linear TL basis already
@@ -1233,7 +1249,7 @@ demonstration with genuine optically-pumped-magnetometer heading error is future
 work. Finally, short lines remain hard for every method, an information limit rather
 than an estimator one. None of these affects the central, reproducible finding: a
 linear, NN-free window smoother is the best of three cold-start estimators on
-\num{9} of \num{10} cases---bounded where the plain causal filter diverges, and
+all \num{8} full-length cold-start cases---bounded where the plain causal filter diverges, and
 better than an NN-augmented causal filter without using a network.
 
 \section{Conclusion}\label{sec:conclusion}
