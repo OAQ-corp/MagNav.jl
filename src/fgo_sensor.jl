@@ -42,11 +42,13 @@ crude proxy). The following sensor-error factors can be enabled individually or
 together, all entering the scalar measurement **linearly** (well-conditioned
 Gauss–Newton):
 
-- **Heading error** (`n_harm > 0`): a truncated Fourier series in the
-  sensor–field angle `θ` (`heading = :geometry`, physical) or the aircraft yaw
-  `ψ` (`heading = :yaw`, legacy proxy),
+- **Heading error** (`n_harm > 0`): the optically-pumped-magnetometer (OPM)
+  heading error as a cosine-harmonic expansion in the sensor–field angle `ψ`
+  (`= θ`, the angle between the optical axis and the field), following the
+  scalar-atomic-magnetometer models of Hager et al. (2026) and Wang et al.
+  (2020, IEEE GRSL). The harmonic orders are `{1,2,4}` for `n_harm ≥ 3`:
 
-      Δ_head(t) = Σ_{k=1}^{n_harm} [ a_k cos(k θ_t) + b_k sin(k θ_t) ] ,
+      Δ_head(t) = Σ_{n∈{1,2,4}} c_n cos(n ψ_t) ,   (linear in the coefficients c_n)
 
   whose `k=1` term captures the vector light shift and `k=2` the nonlinear
   Zeeman effect. `θ_t = ∠(ê, B_body(t))`, with `B_body = Cnb' B_nav` (IGRF).
@@ -57,15 +59,17 @@ Gauss–Newton):
 - **Linear drift** (`drift = true`): electronics/sensor drift
   `Δ_drift(t) = d · (t-1) dt` (1 state, nT/s).
 
-- **Dead-zone weighting** (`dead_zone = true`): near `θ = 0°/90°` the single-beam
-  signal amplitude `A(θ) = |sin 2θ|` collapses, so the effective measurement
-  variance is inflated as `R/A(θ)²` (floored by `dz_floor`), down-weighting
-  dead-zone samples — the physical analog of a robust kernel.
+- **Dead-zone weighting** (`dead_zone = true`): near the OPM equatorial dead
+  zone (field ⟂ optical axis, `|cos ψ| → 0`) the signal amplitude collapses and
+  the effective noise is amplified by `1/max(|cos ψ|, ε)` (Hager et al. 2026),
+  so the measurement information is weighted by `w = max(|cos ψ|, ε)²`
+  (`ε = dz_floor`), down-weighting dead-zone samples — the physical analog of a
+  robust kernel.
 
 Unlike a low-dimensional grid/point-mass estimator (position only), the
 continuous factor graph estimates these sensor-error states **jointly with
 navigation**, recovering a sensor calibration as a by-product. Estimated states
-are ordered `[Pinson (nx0) ; heading (2 n_harm) ; bias (3) ; drift (1)]`.
+are ordered `[Pinson (nx0) ; heading (n_harm cosine coeffs) ; bias (3) ; drift (1)]`.
 
 **Arguments:** (in addition to those of [`fgo`](@ref))
 - `n_harm`:      number of heading-error harmonics (`0` disables the heading factor)
@@ -122,7 +126,11 @@ function fgo_sensor(lat, lon, alt, vn, ve, vd, fn, fe, fd, Cnb, meas, dt, itp_ma
 
     N   = length(lat)
     nx0 = size(P0,1)
-    nh  = 2*n_harm
+    # OPM heading error uses cosine harmonics at orders {1,2,4} (Hager et al.
+    # 2026; Wang et al. 2020): delta_h = sum_n c_n cos(n psi). One coefficient
+    # per harmonic (not a full Fourier cos/sin pair).
+    harm_orders = n_harm >= 3 ? [1,2,4] : collect(1:n_harm)
+    nh  = length(harm_orders)
     nb  = cal_bias ? 3 : 0
     nd  = drift    ? 1 : 0
     nx  = nx0 + nh + nb + nd
@@ -156,20 +164,24 @@ function fgo_sensor(lat, lon, alt, vn, ve, vd, fn, fe, fd, Cnb, meas, dt, itp_ma
     end
 
     # sensor-error measurement bases (each row is that factor's Jacobian entry)
+    # OPM heading error: cosine harmonics at orders {1,2,4} (Hager 2026 eq. 20).
     Bh = zeros(eltype(P0),nh,N)
-    for k = 1:n_harm
-        Bh[2k-1,:] = cos.(k .* ang)
-        Bh[2k  ,:] = sin.(k .* ang)
+    for (i,n) in enumerate(harm_orders)
+        Bh[i,:] = cos.(n .* ang)
     end
     Bb = cal_bias ? u_body : zeros(eltype(P0),0,N)          # hard-iron bias
     Bd = drift ? reshape((0:N-1) .* dt,1,N) .* one(eltype(P0)) :
                  zeros(eltype(P0),0,N)                       # linear drift [s]
 
-    # dead-zone measurement weight: R_eff = R / A(θ)^2, A(θ)=|sin 2θ|
+    # dead-zone measurement weight (OPM equatorial dead zone, Hager 2026 eq. 21):
+    # the signal amplitude collapses as the field nears perpendicular to the
+    # optical axis (|cos psi| -> 0), amplifying the effective noise by
+    # 1/max(|cos psi|, eps); hence the measurement information is weighted by
+    # w = max(|cos psi|, eps)^2. eps = dz_floor regularizes the loss-of-lock zone.
     w_dz = ones(eltype(P0),N)
     if dead_zone
         for t = 1:N
-            w_dz[t] = clamp(sin(2*theta[t])^2, dz_floor^2, 1.0)
+            w_dz[t] = max(abs(cos(theta[t])), dz_floor)^2
         end
     end
 

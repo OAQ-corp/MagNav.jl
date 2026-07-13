@@ -2,12 +2,12 @@
 # A simulated flight over a HIGH-RESOLUTION survey map, with heading variation,
 # is corrupted with KNOWN, physically-motivated scalar-magnetometer errors of an
 # optically-pumped / quantum sensor (Oelsner et al. 2022):
-#   - heading error   Δ_head = k1 cos θ + k2 cos 2θ   (light shift + nonlinear
-#                                                       Zeeman), θ = ∠(axis, B)
+#   - heading error   Δ_head = Σ_{n∈{1,2,4}} c_n cos(n ψ)  (OPM light shift +
+#                     nonlinear Zeeman; Hager et al. 2026, Wang et al. 2020 GRSL)
 #   - hard-iron bias  Δ_bias = m · û_body(t)          (fluxgate vector bias)
 #   - linear drift    Δ_drift = d · t                 (electronics drift)
-#   - dead zones      heteroscedastic noise ∝ 1/|sin 2θ| (signal collapses near
-#                                                          θ = 0°/90°)
+#   - dead zones      noise amplified by 1/max(|cos ψ|,ε) (OPM equatorial dead
+#                     zone at ψ = 90°; Hager et al. 2026 eq. 21)
 # The batch FGO is run with each combination of sensor-error factors and we
 # report navigation error (DRMS) plus how well each factor RECOVERS its truth.
 #
@@ -72,9 +72,13 @@ for t = 1:N
 end
 
 ##* inject KNOWN sensor errors ------------------------------------------------
-k1_true = 10.0   # light shift        (cos θ)  [nT]
-k2_true =  6.0   # nonlinear Zeeman   (cos 2θ) [nT]
-d_head  = k1_true .* cos.(theta) .+ k2_true .* cos.(2 .* theta)
+# OPM heading error: cosine harmonics at orders {1,2,4} (Hager et al. 2026 eq. 20;
+# Wang et al. 2020, IEEE GRSL). c1 = light shift, c2 = nonlinear Zeeman, c4 higher.
+c1_true = 10.0   # cos(1 ψ)  [nT]
+c2_true =  6.0   # cos(2 ψ)  [nT]
+c4_true =  3.0   # cos(4 ψ)  [nT]
+d_head  = c1_true .* cos.(theta) .+ c2_true .* cos.(2 .* theta) .+
+          c4_true .* cos.(4 .* theta)
 
 m_true  = [15.0,-10.0,6.0]                       # hard-iron bias [nT]
 d_bias  = [dot(m_true,u_body[:,t]) for t = 1:N]
@@ -82,8 +86,11 @@ d_bias  = [dot(m_true,u_body[:,t]) for t = 1:N]
 dr_true = 0.02                                   # drift [nT/s]
 d_drift = dr_true .* (0:N-1) .* traj.dt
 
-A       = clamp.(abs.(sin.(2 .* theta)),0.05,1.0) # dead-zone signal amplitude
-dz_noise = (1.0 ./ A) .* randn(N)                 # heteroscedastic (∝ 1/A) noise
+# OPM equatorial dead zone (Hager et al. 2026 eq. 21): effective noise amplified
+# by 1/max(|cos ψ|, ε), ε = 0.1; near ψ = 90° the OPM signal collapses.
+eps_dz   = 0.1
+amp      = 1.0 ./ max.(abs.(cos.(theta)), eps_dz)
+dz_noise = amp .* randn(N)                        # heteroscedastic OPM noise
 
 mag_corrupt = mag_clean .+ d_head .+ d_bias .+ d_drift .+ dz_noise
 println("θ span: ",round(rad2deg(maximum(theta)-minimum(theta)),digits=0)," deg")
@@ -104,11 +111,12 @@ ins_drms = sqrt(mean(dlat2dn.(ins.lat .- traj.lat, traj.lat).^2 .+
                      dlon2de.(ins.lon .- traj.lon, traj.lat).^2))
 
 function recovered(fr, nh, cb, dr)
-    a1 = nh >= 1 ? median(fr.x[19,:]) : NaN   # cos θ  coeff  (light shift)
-    a2 = nh >= 2 ? median(fr.x[21,:]) : NaN   # cos 2θ coeff  (nonlinear Zeeman)
-    ib = 18 + 2nh
+    # heading states are nh cosine coefficients (orders {1,2,4} for nh=3)
+    a1 = nh >= 1 ? median(fr.x[19,:]) : NaN   # cos(1 ψ) coeff (light shift)
+    a2 = nh >= 2 ? median(fr.x[20,:]) : NaN   # cos(2 ψ) coeff (nonlinear Zeeman)
+    ib = 18 + nh
     m  = cb ? median(fr.x[ib+1:ib+3,:],dims=2)[:] : fill(NaN,3)
-    id = 18 + 2nh + (cb ? 3 : 0)
+    id = 18 + nh + (cb ? 3 : 0)
     d  = dr ? median(fr.x[id+1,:]) : NaN
     return (a1,a2,m,d)
 end
@@ -116,10 +124,10 @@ end
 ##* factorial ablation --------------------------------------------------------
 cases = [ # name                     n_harm cal_bias drift dead_zone
     ("baseline (no sensor)",              0, false, false, false),
-    ("heading (geometry, n=2)",           2, false, false, false),
-    ("heading + dead-zone wt",            2, false, false, true ),
-    ("heading + dz + fluxgate",           2, true,  false, true ),
-    ("heading + dz + flux + drift",       2, true,  true,  true ),
+    ("heading (OPM, n={1,2,4})",          3, false, false, false),
+    ("heading + dead-zone wt",            3, false, false, true ),
+    ("heading + dz + fluxgate",           3, true,  false, true ),
+    ("heading + dz + flux + drift",       3, true,  true,  true ),
 ]
 
 results = DataFrame(method=String[],robust=String[],drms=Float64[],
@@ -127,7 +135,7 @@ results = DataFrame(method=String[],robust=String[],drms=Float64[],
                     mz=Float64[],drift=Float64[])
 
 println("\nmap: $map_used | N=$N | INS DRMS: ",round(ins_drms,digits=1)," m")
-println("truth: k1=$k1_true k2=$k2_true  m=$m_true  drift=$dr_true\n")
+println("truth: c1=$c1_true c2=$c2_true c4=$c4_true  m=$m_true  drift=$dr_true\n")
 
 for robust in (:none, :huber)
     println("=== robust = $robust ===")
@@ -139,7 +147,7 @@ for robust in (:none, :huber)
         (a1,a2,m,dd) = recovered(fr,nh,cb,dr)
         push!(results,(name,String(robust),d,a1,a2,m[1],m[2],m[3],dd))
         println(rpad(name,30)," DRMS=",rpad(round(d,digits=1),7)," m",
-                nh>=1 ? "  k̂1=$(round(a1,digits=1)) k̂2=$(round(a2,digits=1))" : "",
+                nh>=1 ? "  ĉ1=$(round(a1,digits=1)) ĉ2=$(round(a2,digits=1))" : "",
                 cb    ? "  m̂=$(round.(m,digits=1))" : "",
                 dr    ? "  d̂=$(round(dd,digits=3))" : "")
     end

@@ -133,6 +133,20 @@ online and jointly with navigation, from the same measurements used to fix
 position---coupling that makes both estimation and its analysis substantially
 harder than the calibrated case.
 
+A second difficulty, prominent on the SGL~2020 cabin
+magnetometers~\cite{gnadt2020}, is that the linear TL basis does not span the true
+interference: platform currents and other non-rigid, non-attitude sources
+contribute a large fraction of the field that no set of Tolles--Lawson
+coefficients can represent~\cite{gnadt2022}. This has motivated a line of
+learning-augmented compensation on this dataset---neural-network heading-error and
+denoising models~\cite{williams1993,gnadt2022}, and the online EKF+TL+NN whose
+residual network mops up exactly this un-modeled remainder~\cite{hager2026}. The
+scalar optically-pumped magnetometers used for the cabin channels add their own
+orientation-dependent errors---heading error and equatorial dead
+zones~\cite{hager2026b,wang2020}---on top of the platform field. How to absorb the
+non-TL remainder \emph{without} a neural network is one of the questions this paper
+addresses.
+
 % P4: Cluster A -- Bayesian filtering / map matching
 Recursive Bayesian filtering is the standard machinery for map-matching
 navigation, from the linear Kalman filter~\cite{kalman1960} to nonlinear variants.
@@ -580,17 +594,24 @@ $\boldsymbol{\chi}$ with three physically motivated scalar-magnetometer error
 variables, each appearing additively in the residual~\eqref{eq:resid}, plus one
 measurement re-weighting:
 \begin{enumerate}
-\item \emph{Heading error}, modeled as a truncated Fourier series in the
-sensor--field angle $\theta_t$,
-$b^{\mathrm{hdg}}_t=\sum_{k=1}^{K}\big(a_k\cos k\theta_t+b_k\sin k\theta_t\big)$,
-with coefficients $\{a_k,b_k\}$ as graph variables;
+\item \emph{OPM heading error}, modeled as the cosine-harmonic expansion of the
+optically-pumped (scalar-atomic) magnetometer in the sensor--field angle
+$\psi_t=\angle(\hat{\mathbf{e}},\mathbf{B}_t)$,
+$b^{\mathrm{hdg}}_t=\sum_{n\in\{1,2,4\}}c_n\cos(n\psi_t)$~\cite{hager2026b,wang2020},
+with coefficients $\{c_n\}$ as graph variables; the $n{=}1$ term is the vector
+light shift and $n{=}2$ the nonlinear Zeeman effect. Because $\psi_t$ is known
+from attitude and IGRF, the term is linear in $\{c_n\}$ and, as in the
+Tolles--Lawson case~\cite{wang2020}, enters the graph as an ordinary linear
+regressor;
 \item \emph{Hard-iron bias} $b^{\mathrm{hi}}$, a constant offset variable;
 \item \emph{Linear drift} $b^{\mathrm{dr}}_t=\gamma_0+\gamma_1 t$, capturing slow
 electronics drift;
 \item \emph{Dead-zone weight}: not a graph variable but a heteroscedastic
-measurement information $R_t^{-1}=R^{-1}\,\omega(\theta_t)$ that de-weights
-samples near the optically-pumped-magnetometer dead zones (a de-weighting any
-estimator could apply; it is included for completeness of the sensor model).
+measurement information $R_t^{-1}=R^{-1}\max(|\cos\psi_t|,\epsilon)^2$
+($\epsilon{=}0.1$) that follows the OPM signal-amplitude collapse near the
+equatorial dead zone (field $\perp$ optical axis)~\cite{hager2026b} and
+de-weights those samples (a de-weighting any estimator could apply; it is
+included for completeness of the sensor model).
 \end{enumerate}
 The augmented residual is $r_t=z_t-h(\mathbf{p}_t)-\mathbf{A}_t^{\top}\boldsymbol{\beta}_t
 -S_t-b^{\mathrm{hdg}}_t-b^{\mathrm{hi}}-b^{\mathrm{dr}}_t$. Each term is exogenous to
@@ -1132,6 +1153,32 @@ Batch FGO & \ding{51} & \ding{51} & \ding{51} & \ding{55} \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\subsection{Handling the non-Tolles--Lawson remainder}
+A fair question is how the estimator copes with the large fraction of the SGL~2020
+cabin-sensor interference that the linear TL basis cannot span (platform currents
+and other non-attitude sources), given that it carries no neural network for the
+purpose. It does not model that remainder as the network does; it absorbs it
+through three linear--Gaussian and robust mechanisms. First, the \emph{time-varying}
+coefficients $\boldsymbol{\beta}_t$: a static TL fit leaves the slowly drifting
+part of the current signature in the residual, whereas the per-window
+relinearization lets $\boldsymbol{\beta}_t$ follow it, recovering the
+low-frequency, maneuver-correlated component a calibration flight cannot.
+Second, the FOGM disturbance state $S_t$, a first-order Gauss--Markov process that
+absorbs the temporally correlated but attitude-unexplained residual---the
+linear--Gaussian analogue of a learned residual, though only a scalar AR(1) and so
+far less expressive than a network. Third, the Huber kernel, which treats the
+heavy-tailed transient currents that neither term explains as outliers to be
+down-weighted rather than fit, so they cannot corrupt position. The honest summary
+is a trade: the network buys a lower compensation residual, while the
+window$+$FOGM$+$robust combination buys navigation robustness \emph{despite} a
+higher residual---which is why our uncompensated-Mag~4 DRMS (tens to hundreds of
+metres) is far above survey-grade compensation yet still bounds the INS drift. The
+factor graph also leaves an obvious upgrade path that keeps the formulation intact:
+a learned residual can be added as an additional factor (for example a
+Gaussian-process or small-network term on the same measurement), giving the
+network's expressiveness within the graph rather than inside a filter---which we
+leave to future work.
 
 \subsection{The role of observability}
 Proposition~\ref{prop:obs} delimits when the joint problem is well-posed at all: the

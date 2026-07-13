@@ -247,21 +247,21 @@ rms_r(fr) = sqrt(mean(abs2, fr.r))
                          fogm_tau=fogm_tau,n_harm=2,cal_bias=true,robust=:huber)
     @test fr_base isa FILTres
     @test size(fr_base.x,1) == 18                # no sensor states
-    @test size(fr_head.x,1) == 18 + 2            # 1 heading harmonic
-    @test size(fr_both.x,1) == 18 + 4 + 3        # 2 harmonics + 3 bias states
+    @test size(fr_head.x,1) == 18 + 1            # 1 cosine heading coeff
+    @test size(fr_both.x,1) == 18 + 2 + 3        # 2 cosine coeffs + 3 bias states
     @test all(isfinite, fr_head.x)
     @test all(isfinite, fr_both.x)
     # extra measurement DOF cannot increase the post-fit residual
     @test rms_r(fr_head) <= rms_r(fr_base) + 1e-6
     @test rms_r(fr_both) <= rms_r(fr_base) + 1e-6
-    # heading coefficient states are estimated (non-trivial) & finite
-    @test all(isfinite, fr_head.x[19:20,:])
-    # full sensor-error model: heading + bias + drift, dead-zone weighting
+    # heading coefficient state is estimated (non-trivial) & finite
+    @test all(isfinite, fr_head.x[19,:])
+    # full sensor-error model: heading {1,2,4} + bias + drift, dead-zone weighting
     fr_all = fgo_sensor(ins,mag_head,itp_mapS;P0=P0,Qd=Qd,R=R,
                         baro_tau=baro_tau,acc_tau=acc_tau,gyro_tau=gyro_tau,
-                        fogm_tau=fogm_tau,n_harm=2,cal_bias=true,drift=true,
+                        fogm_tau=fogm_tau,n_harm=3,cal_bias=true,drift=true,
                         dead_zone=true)
-    @test size(fr_all.x,1) == 18 + 4 + 3 + 1
+    @test size(fr_all.x,1) == 18 + 3 + 3 + 1
     @test all(isfinite, fr_all.x)
     @test fgo_sensor(ins,mag_head,itp_mapS;n_harm=1,cal_bias=true)   isa FILTres
     @test fgo_sensor(ins,mag_head,itp_mapS;n_harm=1,heading=:yaw)    isa FILTres
