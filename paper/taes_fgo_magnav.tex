@@ -903,9 +903,12 @@ full line & \textbf{FGO (RTS, Huber)} & \textbf{14.0} \\
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\columnwidth]{figs/fig_map.pdf}
-\caption{Eastern anomaly map and flight line 1003.02. The inset zooms a
-mid-flight window where the free-inertial (INS) track drifts off the truth while
-the EKF and the factor-graph (FGO) estimates track it.}
+\caption{Eastern anomaly map and flight line 1003.02, providing geographic
+context; the inset zooms the fine anomaly structure the map-matching factor
+exploits along the line. The estimator comparison is deferred to
+Figs.~\ref{fig:poserr}--\ref{fig:cdf}: at the survey ground speed a
+metre-level track error is smaller than one \SI{12}{\second} sample and cannot
+be resolved on a map.}
 \label{fig:map}
 \end{figure}
 
@@ -914,8 +917,9 @@ the EKF and the factor-graph (FGO) estimates track it.}
 \includegraphics[width=0.98\columnwidth]{figs/fig_poserr.pdf}
 \caption{Horizontal position error on line 1003.02. The batch factor graph (FGO,
 blue) holds a tighter bound than the EKF (red) across the line; the shaded band
-marks the FGO improvement, and free inertial (INS) diverges. Legend DRMS values are
-computed over the full line, without the warm-up exclusion of Table~\ref{tab:bench}.}
+marks the FGO improvement, and free inertial (INS) diverges. The labelled DRMS
+values are computed over the full line, without the warm-up exclusion of
+Table~\ref{tab:bench}.}
 \label{fig:poserr}
 \end{figure}
 

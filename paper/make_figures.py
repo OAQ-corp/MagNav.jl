@@ -58,10 +58,13 @@ def fig_breadth():
     ax.text(1e4, len(rows)-0.3, "10 km", fontsize=6.5, color="0.4",
             ha="center", va="bottom")
     ax.grid(True, axis="x", which="major")
+    # legend below the axis so it never sits on the (long) 1006.08 bars
     ax.legend(handles=[Patch(facecolor=C_WEAK, label="EKF, online TL (weak)"),
                        Patch(facecolor=C_BASE1, label="EKF+TL+NN (strong)"),
                        Patch(facecolor=C_PROPOSED, label="FGO window (proposed)")],
-              loc="lower right", frameon=False, fontsize=7)
+              loc="upper center", bbox_to_anchor=(0.5, -0.16), ncol=3,
+              frameon=False, fontsize=7, handlelength=1.3, columnspacing=1.2,
+              handletextpad=0.5)
     despine(ax)
     fig.savefig(os.path.join(OUT, "fig_breadth.pdf"))
     plt.close(fig)
@@ -285,8 +288,8 @@ def fig_obs():
                 color="#333")
 
     # (b) near-collinear: confounded
-    span(axs[1], 24, C_PROPOSED, r"range$(\mathbf{G})$", 1.02, 0.28)
-    span(axs[1], 31, C_BASE1, r"range$(\boldsymbol{\Psi})$", -0.60, -0.75)
+    span(axs[1], 24, C_PROPOSED, r"range$(\mathbf{G})$", 1.02, -0.02)
+    span(axs[1], 31, C_BASE1, r"range$(\boldsymbol{\Psi})$", -0.62, -0.80)
     d = np.deg2rad(27.5)
     axs[1].annotate("", xy=(1.05*np.cos(d), 1.05*np.sin(d)),
                     xytext=(0, 0),

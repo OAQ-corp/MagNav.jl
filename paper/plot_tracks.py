@@ -25,70 +25,85 @@ with open(os.path.join(HERE, "map_grid.csv")) as f:
 
 
 def fig_map():
-    fig, ax = plt.subplots(figsize=(COL_W, 3.0))
+    """Geographic context: the flight line over the anomaly field, with a zoom
+    on the fine anomaly structure the map-matching factor exploits. The
+    estimator-vs-estimator comparison is in Figs. for error/CDF, not here:
+    at ~80 m/s a meter-level track error is smaller than one 12 s sample and
+    cannot be resolved on a map."""
+    from mpl_toolkits.axes_grid1.inset_locator import mark_inset
+    fig, ax = plt.subplots(figsize=(COL_W, 3.1))
     im = ax.imshow(grid, extent=[lonlo, lonhi, latlo, lathi], origin="lower",
                    cmap="RdBu_r", aspect="auto", alpha=0.95,
                    vmin=np.percentile(grid, 2), vmax=np.percentile(grid, 98))
-    ax.plot(t["tlon"], t["tlat"], "-", color="k", lw=1.7,
-            label="flight line 1003.02")
+    ax.plot(t["tlon"], t["tlat"], "-", color="k", lw=1.6,
+            solid_capstyle="round", solid_joinstyle="round")
     cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.02)
     cb.set_label("map anomaly [nT]", fontsize=8)
     cb.ax.tick_params(labelsize=7)
     ax.set_xlabel("longitude [deg]")
     ax.set_ylabel("latitude [deg]")
-    ax.legend(loc="upper right", framealpha=0.9, fontsize=7)
+    # direct label on the flight line, parked in a track-free corner with a
+    # light halo box so it never sits on the black line
+    ax.text(0.03, 0.965, "flight line 1003.02", transform=ax.transAxes,
+            fontsize=7.5, fontweight="bold", color="k", va="top", ha="left",
+            bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="0.6", lw=0.6,
+                      alpha=0.85))
 
-    # zoom inset: a short mid-flight window where the estimates separate
-    n = len(t); i0 = n // 2; i1 = min(n, i0 + 14)
-    axin = inset_axes(ax, width="42%", height="42%", loc="lower left",
-                      bbox_to_anchor=(0.05, 0.14, 1, 1), bbox_transform=ax.transAxes)
-    axin.set_facecolor("white")
-    axin.plot(t["tlon"][i0:i1], t["tlat"][i0:i1], "-", color=C_REF, lw=2.0,
-              label="truth")
-    axin.plot(t["ilon"][i0:i1], t["ilat"][i0:i1], ":", color="0.45", lw=1.4,
-              label="INS")
-    axin.plot(t["elon"][i0:i1], t["elat"][i0:i1], "--", color=C_BASE1, lw=1.4,
-              label="EKF")
-    axin.plot(t["flon"][i0:i1], t["flat"][i0:i1], "-", color=C_PROPOSED, lw=1.7,
-              label="FGO")
+    # inset: zoom on a strong-gradient patch the line crosses (why map-matching
+    # is well conditioned here) -- NOT an estimator comparison
+    zlon = (-75.99, -75.84); zlat = (44.66, 44.80)
+    axin = inset_axes(ax, width="38%", height="38%", loc="lower left",
+                      bbox_to_anchor=(0.035, 0.045, 1, 1),
+                      bbox_transform=ax.transAxes)
+    axin.imshow(grid, extent=[lonlo, lonhi, latlo, lathi], origin="lower",
+                cmap="RdBu_r", aspect="auto",
+                vmin=np.percentile(grid, 2), vmax=np.percentile(grid, 98))
+    axin.plot(t["tlon"], t["tlat"], "-", color="k", lw=1.4,
+              solid_capstyle="round")
+    axin.set_xlim(*zlon); axin.set_ylim(*zlat)
     axin.set_xticks([]); axin.set_yticks([])
-    axin.set_title("zoom", fontsize=7, pad=1.5)
+    axin.set_title("anomaly detail", fontsize=6.8, pad=2)
     for s in axin.spines.values():
-        s.set_color("0.4"); s.set_linewidth(0.8)
-    axin.legend(loc="upper center", bbox_to_anchor=(0.5, -0.03), ncol=2,
-                frameon=False, fontsize=6, handlelength=1.4, columnspacing=0.9)
+        s.set_color("0.35"); s.set_linewidth(0.9)
+    mark_inset(ax, axin, loc1=2, loc2=4, fc="none", ec="0.35", lw=0.7)
     ax.tick_params(length=2.5, width=0.7)
     fig.savefig(os.path.join(OUT, "fig_map.pdf"))
     plt.close(fig)
 
 
 def fig_poserr():
-    fig, ax = plt.subplots(figsize=(COL_W, 2.1))
+    fig, ax = plt.subplots(figsize=(COL_W, 2.35))
+    tm = t["tmin"]
     # shade the gap between the baseline EKF and the proposed FGO to make the
     # improvement visible at a glance
-    ax.fill_between(t["tmin"], t["efgo"], t["eekf"],
+    ax.fill_between(tm, t["efgo"], t["eekf"],
                     where=(t["eekf"] >= t["efgo"]), color=C_PROPOSED,
                     alpha=0.12, interpolate=True)
-    ax.plot(t["tmin"], t["eins"], ":", color=C_REF, lw=1.3)
-    ax.plot(t["tmin"], t["eekf"], "--", color=C_BASE1, lw=1.4)
-    ax.plot(t["tmin"], t["efgo"], "-", color=C_PROPOSED, lw=1.9)
+    ax.plot(tm, t["eins"], ":", color=C_REF, lw=1.4)
+    ax.plot(tm, t["eekf"], "--", color=C_BASE1, lw=1.4)
+    ax.plot(tm, t["efgo"], "-", color=C_PROPOSED, lw=2.0)
     ax.set_xlabel("time [min]")
     ax.set_ylabel("horizontal error [m]")
-    ax.set_ylim(0, np.percentile(t["eins"], 99) * 1.05)
-    ax.set_xlim(t["tmin"][0], t["tmin"][-1])
+    ymax = np.max(t["eins"]) * 1.16          # headroom for the INS peak label
+    ax.set_ylim(0, ymax)
+    ax.set_xlim(tm[0], tm[-1])
     ax.grid(True, axis="y")
-    # selective direct labels (dataviz: identity not by color alone)
-    tm = t["tmin"]
-    ax.annotate("INS  (%.0f m DRMS)" % np.sqrt(np.mean(t["eins"]**2)),
-                (tm[len(tm)//2], np.max(t["eins"])*0.97), fontsize=7,
-                color=C_REF, ha="center")
-    ax.annotate("EKF  (%.1f m)" % np.sqrt(np.mean(t["eekf"]**2)),
-                (tm[-1], t["eekf"][-1]), textcoords="offset points",
-                xytext=(-2, 30), fontsize=7, color=C_BASE1, ha="right")
-    ax.annotate("FGO  (%.1f m)" % np.sqrt(np.mean(t["efgo"]**2)),
-                (tm[-1], t["efgo"][-1]), textcoords="offset points",
-                xytext=(-2, 10), fontsize=7, color=C_PROPOSED, ha="right",
-                weight="bold")
+    lead = dict(arrowprops=dict(arrowstyle="-", lw=0.6, color="0.5"),
+                fontsize=7, textcoords="data")
+    # INS: label sits just above its peak (kept clear by the y headroom)
+    ip = int(np.argmax(t["eins"]))
+    ax.annotate("INS  —  %.0f m DRMS" % np.sqrt(np.mean(t["eins"]**2)),
+                xy=(tm[ip], t["eins"][ip]), xytext=(tm[ip], ymax * 0.985),
+                ha="center", va="top", fontsize=7, color=C_REF)
+    # EKF and FGO: labels parked in the empty mid-band with thin leader lines
+    ie = int(np.argmin(np.abs(tm - 47)))
+    ax.annotate("EKF  —  %.1f m" % np.sqrt(np.mean(t["eekf"]**2)),
+                xy=(tm[ie], t["eekf"][ie]), xytext=(tm[ie] - 1, ymax * 0.60),
+                ha="center", va="bottom", color=C_BASE1, **lead)
+    ifg = int(np.argmin(np.abs(tm - 20)))
+    ax.annotate("FGO  —  %.1f m" % np.sqrt(np.mean(t["efgo"]**2)),
+                xy=(tm[ifg], t["efgo"][ifg]), xytext=(tm[ifg], ymax * 0.42),
+                ha="center", va="bottom", color=C_PROPOSED, weight="bold", **lead)
     despine(ax)
     fig.savefig(os.path.join(OUT, "fig_poserr.pdf"))
     plt.close(fig)
