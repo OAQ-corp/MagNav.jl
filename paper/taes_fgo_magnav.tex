@@ -104,18 +104,19 @@ absolute reference for long-endurance aircraft, uncrewed platforms, and
 munitions operating where GNSS cannot be trusted, provided the aircraft's own
 magnetic signature can be removed in flight.
 
-% P2: Scope Narrowing
+% P2: Scope Narrowing -- the problem, stated generally
 Magnetic-anomaly navigation (MagNav) estimates aircraft position by matching the
 measured scalar magnetic field against a surveyed anomaly map, yielding an
-absolute fix that bounds inertial drift~\cite{canciani2017}. The public benchmark
-that has catalyzed recent work is the Signal Enhancement for Magnetic Navigation
-(SGL~2020) challenge dataset, comprising flight-grade INS, multiple onboard
-magnetometers, and high-resolution anomaly maps~\cite{gnadt2020}. That dataset
-also exposes the central obstacle: the dominant error source is the aircraft
-itself, not the map. The platform's own permanent and induced magnetization and
-its eddy-current fields perturb the scalar measurement by hundreds of nanotesla,
-comparable to or larger than the anomaly signal being matched, so the aircraft
-field must be compensated before map matching can recover position.
+absolute fix that bounds inertial drift~\cite{canciani2017}. Its central obstacle
+is not the map but the aircraft itself: the platform's own permanent and induced
+magnetization and its eddy-current fields perturb the scalar measurement by
+hundreds of nanotesla---comparable to or larger than the anomaly signal being
+matched---so the aircraft field must be compensated before map matching can
+recover position. This aircraft-field problem is intrinsic to MagNav and
+independent of any particular airframe; it is most acute for magnetometers
+mounted \emph{inside the cabin}, close to avionics and current-carrying structure,
+rather than on a wingtip stinger boom that holds the sensor away from the platform
+field.
 
 % P3: Technical Background
 Aeromagnetic compensation is classically handled by the Tolles--Lawson (TL)
@@ -131,10 +132,14 @@ online and jointly with navigation, from the same measurements used to fix
 position---coupling that makes both estimation and its analysis substantially
 harder than the calibrated case.
 
-A second difficulty, prominent on the SGL~2020 cabin
-magnetometers~\cite{gnadt2020}, is that the linear TL basis does not span the true
-interference: platform currents and other non-rigid, non-attitude sources
-contribute a large fraction of the field that no set of Tolles--Lawson
+A public benchmark has made these difficulties concrete and measurable: the Signal
+Enhancement for Magnetic Navigation (SGL~2020) challenge dataset~\cite{gnadt2020},
+comprising flight-grade INS, multiple onboard magnetometers---both wingtip-stinger
+and cabin-mounted---and high-resolution anomaly maps, which has catalyzed most
+recent work on the problem. A second difficulty, prominent precisely on its cabin
+magnetometers, is that the linear TL basis does not span the true interference:
+platform currents and other non-rigid, non-attitude sources contribute a large
+fraction of the field that no set of Tolles--Lawson
 coefficients can represent~\cite{gnadt2022}. This has motivated a line of
 learning-augmented compensation on this dataset---neural-network heading-error and
 denoising models~\cite{williams1993,gnadt2022}, and the online EKF+TL+NN whose
