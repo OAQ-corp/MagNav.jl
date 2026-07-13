@@ -207,6 +207,25 @@ estimated quantities are poses and landmarks; it has not been brought to bear on
 observability of estimating a compensation model jointly with position from map
 matching has not been characterized.
 
+% P6.5: Synthesis of the gap
+Taken together, the three lines leave a specific gap. The cold-start MagNav problem
+is fundamentally a \emph{joint} estimation of position and a time-varying
+compensation model from a single scalar stream, in which the two unknowns are
+confounded through the very measurement that must resolve them. Causal filters
+(cluster~A) must commit each state before the maneuvers that would disambiguate the
+compensation have occurred, and so diverge when the initial residual is large;
+learned online compensation (cluster~B) repairs that residual but keeps the causal,
+commit-online architecture and adds parameters that are difficult to certify; and
+factor-graph smoothing (cluster~C), which can defer commitment and estimate
+structured nuisance variables jointly, has not been applied to this problem, nor has
+anyone characterized when the joint problem is even observable. What is missing is
+an estimator that (i)~defers commitment so that late-arriving calibration
+information corrects early navigation states, (ii)~represents the compensation---and
+the physical sensor errors of the scalar magnetometer---as first-class,
+time-varying variables rather than a black box, and (iii)~comes with an explicit
+condition for when position and compensation can be separated at all. This paper
+supplies all three.
+
 % P7: Proposed approach + contributions
 In this work we cast online Tolles--Lawson compensation as a set of time-varying
 variables in a factor graph and solve the joint compensation-and-navigation
@@ -219,21 +238,46 @@ Rauch--Tung--Striebel (RTS) smoother~\cite{rauch1965}, so smoothing per se is no
 the contribution; the joint windowed estimation of a time-varying compensation is.
 The paper makes the following contributions:
 \begin{enumerate}
-  \item \textbf{NN-free online compensation:} we formulate online TL compensation
-        as factor-graph variables in a fixed-lag sliding-window smoother, an
-        alternative to online EKF+TL+NN that needs no neural network
-        (Section~\ref{sec:method}).
-  \item \textbf{Observability condition:} we prove an exact linear condition for
-        the joint observability of compensation and navigation and derive an
-        exogeneity design rule for the compensation features
-        (Section~\ref{sec:observability}).
-  \item \textbf{Reimplemented baseline and breadth study:} we reimplement---rather
-        than merely cite---the online EKF+TL+NN result and evaluate both estimators on five
-        long survey lines from three flights and two maps
-        (Section~\ref{sec:results}).
-  \item \textbf{Sensor-error factors:} we cast physically motivated
-        scalar-magnetometer error terms as graph variables that a position-only
-        estimator cannot represent (Section~\ref{sec:method}).
+  \item \textbf{Neural-network-free online compensation.} We formulate online
+        Tolles--Lawson compensation as a chain of time-varying variables in a
+        fixed-lag sliding-window factor graph and solve navigation and
+        compensation jointly. The per-window relinearization supplies the same
+        time-varying compensation that the competing method draws from an online
+        network, while deferring commitment over the window removes the causal
+        filter's cold-start failure mode. The result is an estimator that, on the
+        uncompensated cabin magnetometers, matches or beats the online EKF+TL+NN
+        of~\cite{hager2026} without any learned component (Section~\ref{sec:method},
+        Table~\ref{tab:1007}). We are deliberate about what is and is not claimed:
+        for the linear--Gaussian error model the batch estimate equals the RTS
+        smoother, so smoothing \emph{per se} is not the contribution---the joint,
+        windowed estimation of a \emph{time-varying} compensation together with
+        the robustness it buys at cold start is.
+  \item \textbf{Exact joint-observability condition.} We prove a necessary and
+        sufficient linear-algebraic condition under which the aircraft position
+        and the compensation coefficients are \emph{jointly} observable from the
+        scalar magnetometer, separating three distinct failure modes (an
+        unexcited trajectory, a rank-deficient compensation basis, and---the
+        subtle one---a compensation subspace that is confounded with the anomaly
+        gradient). From it we derive a concrete exogeneity design rule for
+        choosing compensation features that a filter tuned by trial and error
+        cannot see (Section~\ref{sec:observability}).
+  \item \textbf{Reimplemented baseline and multi-line breadth study.} We
+        reimplement---rather than merely cite---the online EKF+TL+NN result of
+        \cite{hager2026} and place it head-to-head with the proposed smoother and a
+        weak online-TL EKF on ten cold-start cases spanning five long lines, three
+        flights, and two anomaly maps. The study isolates exactly what the neural
+        network buys (it keeps the causal filter bounded where online TL alone
+        diverges) and what it does not (on every full-length navigation line the
+        NN-free smoother is the most accurate of the three), giving a like-for-like
+        comparison that the literature has lacked (Section~\ref{sec:results}).
+  \item \textbf{Physical sensor-error factors.} We cast physically motivated
+        optically-pumped-magnetometer error terms---a harmonic heading error and a
+        dead-zone attenuation of the scalar measurement---as additional graph
+        variables, and show by a controlled factorial ablation which of them are
+        load-bearing. These are degrees of freedom that a position-only estimator
+        cannot represent, and they let the graph absorb structured sensor error
+        that would otherwise leak into the position estimate
+        (Section~\ref{sec:method}, Table~\ref{tab:sensor}).
 \end{enumerate}
 
 % P8: Organization
@@ -455,6 +499,34 @@ the compensation is identified from the whole trajectory, and because the batch
 solution uses future as well as past measurements, early navigation states benefit
 from calibration information that only becomes observable after later
 maneuvers---the property a causal filter lacks.
+
+\smallskip\noindent\textbf{Absorbing the non-Tolles--Lawson remainder.}
+On this dataset the cabin interference is dominated by platform currents and other
+sources the attitude-only TL basis $\mathbf{A}_t$ cannot span, and the online
+EKF+TL+NN of~\cite{hager2026} devotes a neural network precisely to this remainder.
+The proposed graph carries no network; instead three of the factors above combine
+to absorb the remainder as a structured, robust regression problem. The
+random-walk factor~(iii) makes $\boldsymbol{\beta}_t$ \emph{time-varying}: writing
+the true interference as $\mathbf{A}_t^{\top}\boldsymbol{\beta}^\star+e_t$, a static
+fit ($\mathbf{Q}^{\beta}\!\to\!\mathbf{0}$) forces the entire current signature
+into the residual $e_t$, whereas a nonzero $\mathbf{Q}^{\beta}$ lets the estimated
+coefficients track the slowly drifting, maneuver-correlated projection of the
+currents onto $\mathbf{A}_t$---the low-frequency part a single calibration fit
+cannot recover. The disturbance state $S_t$ in the residual~\eqref{eq:resid}, a
+first-order Gauss--Markov process folded into the Pinson--FOGM factor~(ii), then
+carries the temporally correlated component of $e_t$ that is orthogonal to
+$\mathbf{A}_t$; it is the linear--Gaussian, single-scalar analogue of the learned
+residual, cheaper and far less expressive but requiring no training data. What
+neither term explains---the heavy-tailed switching transients of onboard
+electronics---is handled not by fitting but by the robust kernel in factor~(iv),
+which the reweighting of Section~\ref{sec:method}-D down-weights so that such
+samples cannot pull the position estimate. The observability condition of
+Section~\ref{sec:observability} is what keeps this well-posed: $S_t$ and
+$\boldsymbol{\beta}_t$ may only absorb signal that is \emph{not} collinear with the
+map gradient $\mathbf{g}_t$, so genuine map information is not silently explained
+away as interference. The trade this makes explicit---a higher compensation
+residual than the network, exchanged for navigation robustness---is quantified in
+Section~\ref{sec:discussion}-B.
 
 \begin{figure*}[t]
 \centering
@@ -1210,22 +1282,16 @@ Batch FGO & \ding{51} & \ding{51} & \ding{51} & \ding{55} \\
 A fair question is how the estimator copes with the large fraction of the SGL~2020
 cabin-sensor interference that the linear TL basis cannot span (platform currents
 and other non-attitude sources), given that it carries no neural network for the
-purpose. It does not model that remainder as the network does; it absorbs it
-through three linear--Gaussian and robust mechanisms. First, the \emph{time-varying}
-coefficients $\boldsymbol{\beta}_t$: a static TL fit leaves the slowly drifting
-part of the current signature in the residual, whereas the per-window
-relinearization lets $\boldsymbol{\beta}_t$ follow it, recovering the
-low-frequency, maneuver-correlated component a calibration flight cannot.
-Second, the FOGM disturbance state $S_t$, a first-order Gauss--Markov process that
-absorbs the temporally correlated but attitude-unexplained residual---the
-linear--Gaussian analogue of a learned residual, though only a scalar AR(1) and so
-far less expressive than a network. Third, the Huber kernel, which treats the
-heavy-tailed transient currents that neither term explains as outliers to be
-down-weighted rather than fit, so they cannot corrupt position. The honest summary
-is a trade: the network buys a lower compensation residual, while the
-window$+$FOGM$+$robust combination buys navigation robustness \emph{despite} a
-higher residual---which is why our uncompensated-Mag~4 DRMS (tens to hundreds of
-metres) is far above survey-grade compensation yet still bounds the INS drift. The
+purpose. Section~\ref{sec:method}-A gives the mechanism---the time-varying
+$\boldsymbol{\beta}_t$, the FOGM state $S_t$, and the robust kernel jointly absorb
+the remainder as a structured robust regression rather than modelling it as the
+network does. Here we make the resulting trade explicit and quantitative. The
+network buys a lower compensation residual; the window$+$FOGM$+$robust combination
+buys navigation robustness \emph{despite} a higher residual---which is why our
+uncompensated-Mag~4 DRMS (tens to hundreds of metres) sits far above survey-grade
+compensation yet still bounds the INS drift, and why on the full-length navigation
+lines that robustness is enough to make the NN-free estimate the most accurate of
+the three (Table~\ref{tab:breadth}). The
 factor graph also leaves an obvious upgrade path that keeps the formulation intact:
 a learned residual can be added as an additional factor (for example a
 Gaussian-process or small-network term on the same measurement), giving the
