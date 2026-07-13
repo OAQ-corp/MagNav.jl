@@ -110,14 +110,14 @@ magnetic signature can be removed in flight.
 \includegraphics[width=0.98\textwidth]{figs/fig_concept.pdf}
 \caption{Concept of the study. (a)~A single scalar magnetometer reading mixes the
 anomaly map signal, which carries the aircraft position $\mathbf{p}_t$, with the
-aircraft field, described by the time-varying Tolles--Lawson coefficients
-$\boldsymbol{\beta}_t$ and a disturbance state $S_t$; position and compensation are
-therefore coupled through the one measurement and must be estimated together.
-(b)~The proposed estimator represents both as variables of a factor graph and
-solves them jointly over a fixed-lag sliding window, so that measurements after a
-given epoch still correct its navigation and compensation before the estimate is
-committed. (c)~The result is bounded navigation at cold start, using no neural
-network, where a causal filter that must commit online can diverge.}
+aircraft field, modelled by the time-varying Tolles--Lawson term
+$\mathbf{A}_t^{\top}\boldsymbol{\beta}_t$; position and compensation are therefore
+coupled through the one measurement and must be estimated together. (b)~The proposed
+estimator represents both as variables of a factor graph and solves them jointly
+over a fixed-lag sliding window, so that measurements after a given epoch still
+correct its navigation and compensation before the estimate is committed. (c)~The
+result is bounded navigation at cold start, using no neural network, where a plain
+online-TL causal filter can diverge.}
 \label{fig:concept}
 \end{figure*}
 
@@ -293,14 +293,14 @@ The paper makes the following contributions:
         diverges) and what it does not (on every full-length navigation line the
         NN-free smoother is the most accurate of the three), giving a like-for-like
         comparison that the literature has lacked (Section~\ref{sec:results}).
-  \item \textbf{Physical sensor-error factors.} We cast physically motivated
-        optically-pumped-magnetometer error terms (a harmonic heading error and a
-        dead-zone attenuation of the scalar measurement) as additional graph
-        variables, and show by a controlled factorial ablation which of them are
-        load-bearing. These are degrees of freedom that a position-only estimator
-        cannot represent, and they let the graph absorb structured sensor error
-        that would otherwise leak into the position estimate
-        (Section~\ref{sec:method}, Table~\ref{tab:sensor}).
+  \item \textbf{Physical sensor-error factors.} We add physically motivated
+        optically-pumped-magnetometer error terms: a harmonic heading error carried
+        as extra graph variables, and a dead-zone attenuation handled as a
+        heteroscedastic reweighting of the scalar measurement. A controlled
+        cumulative ablation then shows which of them are load-bearing. These are
+        model terms that a position-only estimator cannot represent, and they let
+        the graph absorb structured sensor error that would otherwise leak into the
+        position estimate (Section~\ref{sec:method}, Table~\ref{tab:sensor}).
 \end{enumerate}
 
 % P8: Organization
@@ -634,9 +634,9 @@ how much data each compensation estimate sees and thus the effective adaptation
 time; too short and $\boldsymbol{\beta}$ is under-determined, too long and it cannot
 track drift. $L_o$ sets the look-ahead and hence the commit latency: a committed
 state has seen $L_o$ epochs of future data, and the estimator lags real time by
-$L_o$. In the experiments we use $L_w=\SI{5}{\minute}$ and $L_o=\SI{2}{\minute}$; the
-\SI{2}{\minute} window in Table~\ref{tab:1007} shows that halving $L_w$ degrades the
-long-line result, consistent with under-determination. The first window is seeded
+$L_o$. In the experiments we use $L_w=\SI{5}{\minute}$ and $L_o=\SI{90}{\second}$; the
+\SI{2}{\minute} window in Table~\ref{tab:1007} shows that shortening $L_w$ degrades
+the long-line result, consistent with under-determination. The first window is seeded
 with a diffuse prior on $\boldsymbol{\beta}$ (large $\mathbf{P}_0$ block) so the cold
 start is not biased toward zero interference, and the FOGM disturbance state absorbs
 the initial mismatch while the coefficients converge; subsequent windows inherit the
@@ -701,7 +701,7 @@ regressor;
 electronics drift;
 \item Dead-zone weight: not a graph variable but a heteroscedastic
 measurement information $R_t^{-1}=R^{-1}\max(|\cos\psi_t|,\epsilon)^2$
-($\epsilon{=}0.1$) that follows the OPM signal-amplitude collapse near the
+($\epsilon{=}0.05$) that follows the OPM signal-amplitude collapse near the
 equatorial dead zone (field $\perp$ optical axis)~\cite{hager2026b} and
 de-weights those samples (a de-weighting any estimator could apply; it is
 included for completeness of the sensor model).
@@ -1052,10 +1052,11 @@ Mag~4. The window smoother beats the reimplemented NN-augmented filter on both
 sensors without any neural network, using only the linear TL basis carried
 as graph variables; against the values reported in~\cite{hager2026} it is
 \SI{4.4}{\meter} better on Mag~4 and \SI{0.2}{\meter} behind on Mag~5. This
-comparison is on the single line 1007.06, the line~\cite{hager2026}
-evaluates, so the NN baseline breadth across the other four lines remains untested. We attribute the margin to the
-window look-ahead: the coefficients are identified from data on both sides of each
-committed epoch, whereas the EKF must commit with past data only.
+comparison against the published values is on the single line 1007.06, the only
+line~\cite{hager2026} reports; our reimplemented EKF+TL+NN carries the baseline to
+the other lines in the breadth study (Table~\ref{tab:breadth}). We attribute the
+margin to the window look-ahead: the coefficients are identified from data on both
+sides of each committed epoch, whereas the EKF must commit with past data only.
 
 The window length itself trades under-determination against staleness.
 Fig.~\ref{fig:winlen} plots DRMS at the three lengths evaluated on this line: the
@@ -1315,7 +1316,7 @@ factorization and the IRLS reweighting, which in our unoptimized research
 implementation runs comfortably faster than real time on the SGL sampling rate.
 
 These same properties make the estimator compatible with real-time operation. Its
-committed output lags real time by the overlap $L_o$, here \SI{2}{\minute}, a
+committed output lags real time by the overlap $L_o$, here \SI{90}{\second}, a
 latency that suits the map-aiding role, in which the INS supplies the high-rate
 solution and the smoother corrects it periodically, and that the designer trades
 against accuracy through $L_o$. The factor interface is modular, so the

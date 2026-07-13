@@ -192,7 +192,7 @@ def fig_factorgraph():
     for cx in xs[2:]:
         seg(thx-0.24, thy+0.14, cx+0.10, YZ-0.10, ls="--", color="0.55", lw=0.7)
     ax.text(thx+0.38, thy, "optional sensor-error\nvariables (Sec. III-F):\n"
-            r"$\{a_k,b_k\},\,b^{\mathrm{hi}},\,\gamma_0,\gamma_1$"
+            r"$\{c_n\},\,b^{\mathrm{hi}},\,\gamma_0,\gamma_1$"
             "\n(couple to every $z_t$)",
             fontsize=6.4, ha="left", va="center", color="#333")
 
@@ -403,13 +403,14 @@ def fig_concept():
         ec=INK, lw=1.1, fs=7.8)
     box(0.15, 1.15, 2.15, 0.92, "position $\\mathbf{p}_t$\n(navigation)",
         ec=C_PROPOSED, lw=1.2)
-    box(2.85, 1.15, 2.35, 0.92, "aircraft field\n$\\boldsymbol{\\beta}_t,\\,S_t$",
+    box(2.85, 1.15, 2.35, 0.92,
+        "aircraft field\n$\\mathbf{A}_t^{\\top}\\boldsymbol{\\beta}_t$",
         ec=C_BASE1, lw=1.2)
     arrow(2.05, 3.02, 1.35, 2.10, color=C_PROPOSED)
     arrow(3.05, 3.02, 3.95, 2.10, color=C_BASE1)
     ax.text(2.62, 0.62,
             "$z_t=h(\\mathbf{p}_t)+\\mathbf{A}_t^{\\top}\\boldsymbol{\\beta}_t"
-            "+S_t+\\eta_t$", ha="center", va="center", fontsize=7.2, color=INK)
+            "+\\eta_t$", ha="center", va="center", fontsize=7.2, color=INK)
     ax.text(2.62, 0.16, "both unknown, one measurement", ha="center",
             va="center", fontsize=6.5, color="0.45", style="italic")
 
@@ -460,7 +461,7 @@ def fig_concept():
     # proposed: bounded, low
     prop = py + 0.30 + 0.16*np.sin(tt*9) + 0.05
     ax.plot(px+0.12+tt*(pw-0.24), prop, "-", color=C_PROPOSED, lw=2.0)
-    ax.annotate("causal filter\n(cold start)", (px+pw*0.40, py+ph*0.90),
+    ax.annotate("online-TL EKF\n(cold start)", (px+pw*0.40, py+ph*0.90),
                 fontsize=6.3, color=C_BASE1, ha="center", va="center")
     ax.annotate("proposed", (px+pw*0.66, py+0.30), fontsize=6.6,
                 color=C_PROPOSED, ha="center", va="bottom")

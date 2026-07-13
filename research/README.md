@@ -25,7 +25,7 @@ and reproducible simulations.
 | `research/fgo_benchmark.jl` | 181 | real SGL **Flt1003** DRMS benchmark across all methods. |
 | `research/paper_baseline.jl` | — | line 1007.06: our FGO-online (static + sliding-window TL) vs Hager et al. (2026) cited DRMS. |
 | `research/paper_impl.jl` | — | **re-runs** the paper's online EKF+TL+NN (`ekf_online_nn`) cold start on line 1007.06 — a genuine reproduced baseline (Mag 4 40.0 m, Mag 5 17.5 m). |
-| `research/fgo_breadth.jl` | — | **breadth**: window FGO vs causal EKF-online on 5 lines / 3 flights / 2 maps, cold-start cabin mags (§2b) — FGO best of 3 on 9/10 vs weak (online-TL EKF) + strong (EKF+TL+NN) baselines; NN-free. |
+| `research/fgo_breadth.jl` | — | **breadth**: window FGO vs causal EKF-online on 5 lines / 3 flights / 2 maps, cold-start cabin mags (§2b). The paper reports the 4 navigation/survey lines (8 cases, FGO best of 3 on 8/8) and sets aside the 14-min calibration line 1006.08. Baselines: weak (online-TL EKF) + strong (EKF+TL+NN); NN-free. |
 | `research/fgo_sensor_ablation.jl` | 154 | factorial sensor-error ablation with injected-truth recovery. |
 | `research/fgo_tracks.jl` | 131 | geographic map+track and position-error figures. |
 | `.github/workflows/fgo_research.yml` | — | CI: test suite + all three research scripts on every push. |
@@ -95,9 +95,11 @@ same recipe as `paper_impl.jl`) — vs the NN-free FGO window. DRMS [m] after a
 | Flt1007 | 1007.06 | Renfrew | Mag 4 | 318 | 46.7 | 42.2 | **32.7** |
 | Flt1007 | 1007.06 | Renfrew | Mag 5 | 318 | 17.8 | 17.8 | **13.8** |
 
-**EKF+TL+NN diverged on 0/10 (the NN keeps the causal filter bounded), yet the
-NN-free FGO window is best of the three on 9/10 cases** (only loss: 1006.08 Mag 5,
-the hard short line). The plain EKF-online **diverges to tens of km** (41626 /
+**EKF+TL+NN diverged on 0 cases (the NN keeps the causal filter bounded), yet the
+NN-free FGO window is best of the three on all 8 counted cases** (the four
+navigation/survey lines 1007.06, 1007.02, 1003.02, 1003.08). The only case where it
+is not best, 1006.08 Mag 5, is on the 14-min calibration line 1006.08 (Flt1006),
+which the paper sets aside and does not tabulate. The plain EKF-online **diverges to tens of km** (41626 /
 35482 / 17179 m) on three Mag-4 lines and runs off-map on a fourth, while both the
 NN filter and the FGO window stay bounded — the fixed-lag smoother re-linearizes
 over each window, so early
@@ -164,7 +166,7 @@ julia --project=. research/fgo_tracks.jl           # map + track + error figures
 1. **Batch MAP FGO vs EKF on real data** — ✅ Flt1003: 28.3 → 14.0 m.
 2. **"Textbook" sparse GN/QR solver** — ✅ square-root SAM form, matches RTS.
 3. **Tolles-Lawson factors (joint compensation)** — ✅ EKF-online diverges, FGO-online 22.6 m.
-4. **Physical OPM sensor-error factors (heading/dead-zone/bias/drift) + robust** — ✅ ablation 36.6 → 4.8 m, with an honest observability caveat.
+4. **Physical OPM sensor-error factors (heading/dead-zone/bias/drift) + robust** — ✅ cumulative ablation 42.9 → 6.2 m, with an honest observability caveat.
 
 ## 5b. Comparison to the online EKF+TL+NN cold-start literature
 
@@ -267,8 +269,9 @@ features — which is exactly what every FGO result here uses.
 
 ## 7. Limitations & next steps
 
-- **Breadth** ✅ addressed in §2b (5 lines, 3 flights, 2 maps); still worth
-  extending to Monte-Carlo statistics and the full SGL line set.
+- **Breadth** ✅ addressed in §2b (4 counted navigation/survey lines + 1 set-aside
+  calibration line, 3 flights, 2 maps); still worth extending to Monte-Carlo
+  statistics and the full SGL line set.
 - **Baselines**: add MPF and a reproduction of the grid/point-mass MMSE estimator
   for a like-for-like comparison.
 - **Short lines**: the 14-min line (Flt1006 1006.08) is hard for every method —
