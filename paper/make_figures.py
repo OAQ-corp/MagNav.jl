@@ -373,9 +373,111 @@ def fig_pipeline():
     plt.close(fig)
 
 
+def fig_concept():
+    """Graphical abstract of the study: (a) one scalar reading hides two
+    coupled unknowns; (b) a fixed-lag window estimates both jointly, using
+    future data to correct the past; (c) the payoff is bounded navigation
+    where a causal filter diverges. One accent color (proposed blue)."""
+    NEUT_FC, NEUT_EC, INK = "#f2f4f7", "#9aa4b2", "#1f2937"
+    fig, ax = plt.subplots(figsize=(7.0, 2.25))
+    ax.set_xlim(0, 15.6); ax.set_ylim(0, 5.0); ax.axis("off")
+
+    def box(x, y, w, h, txt, fc=NEUT_FC, ec=NEUT_EC, fs=7.4, lw=0.9, tc=INK):
+        ax.add_patch(FancyBboxPatch((x, y), w, h,
+                     boxstyle="round,pad=0.035,rounding_size=0.09",
+                     fc=fc, ec=ec, lw=lw))
+        ax.text(x+w/2, y+h/2, txt, ha="center", va="center", fontsize=fs,
+                color=tc, zorder=5)
+
+    def arrow(x0, y0, x1, y1, color="0.42", lw=1.2, style="-|>", ls="-"):
+        ax.add_patch(FancyArrowPatch((x0, y0), (x1, y1), arrowstyle=style,
+                     mutation_scale=9, lw=lw, color=color, ls=ls,
+                     shrinkA=3, shrinkB=3))
+
+    def title(x, t):
+        ax.text(x, 4.86, t, ha="center", va="top", fontsize=7.7, color=INK)
+
+    # ===== Panel (a): one reading, two coupled unknowns =====
+    title(2.55, "(a) one scalar reading,\ntwo coupled unknowns")
+    box(0.95, 3.05, 3.15, 0.78, "scalar reading $z_t$", fc="white",
+        ec=INK, lw=1.1, fs=7.8)
+    box(0.15, 1.15, 2.15, 0.92, "position $\\mathbf{p}_t$\n(navigation)",
+        ec=C_PROPOSED, lw=1.2)
+    box(2.85, 1.15, 2.35, 0.92, "aircraft field\n$\\boldsymbol{\\beta}_t,\\,S_t$",
+        ec=C_BASE1, lw=1.2)
+    arrow(2.05, 3.02, 1.35, 2.10, color=C_PROPOSED)
+    arrow(3.05, 3.02, 3.95, 2.10, color=C_BASE1)
+    ax.text(2.62, 0.62,
+            "$z_t=h(\\mathbf{p}_t)+\\mathbf{A}_t^{\\top}\\boldsymbol{\\beta}_t"
+            "+S_t+\\eta_t$", ha="center", va="center", fontsize=7.2, color=INK)
+    ax.text(2.62, 0.16, "both unknown, one measurement", ha="center",
+            va="center", fontsize=6.5, color="0.45", style="italic")
+
+    arrow(5.35, 2.6, 6.05, 2.6, color="0.5", lw=1.4)
+
+    # ===== Panel (b): joint estimate over a sliding window =====
+    title(8.15, "(b) estimate both jointly\nover a fixed-lag window")
+    wx, wy, ww, wh = 6.25, 1.30, 3.75, 2.15
+    ax.add_patch(FancyBboxPatch((wx, wy), ww, wh,
+                 boxstyle="round,pad=0.05,rounding_size=0.12",
+                 fc="white", ec=C_PROPOSED, lw=1.5))
+    ax.add_patch(Rectangle((wx+0.14, wy+0.14), ww*0.62, wh-0.28,
+                 fc=C_PROPOSED, alpha=0.10, ec="none"))
+    ax.text(wx+ww*0.32, wy+wh-0.02, "commit", ha="center", va="bottom",
+            fontsize=6.6, color="#0a3355")
+    ax.text(wx+ww*0.80, wy+wh-0.02, "look-\nahead", ha="center", va="bottom",
+            fontsize=6.2, color="0.4")
+    # two chains inside: nav (blue) and compensation (orange)
+    xs = np.linspace(wx+0.45, wx+ww-0.45, 6)
+    for cx in xs:
+        ax.plot([cx], [wy+1.45], "o", ms=4.2, color=C_PROPOSED, zorder=6)
+        ax.plot([cx], [wy+0.55], "s", ms=4.0, color=C_BASE1, zorder=6)
+    ax.plot(xs, [wy+1.45]*6, "-", color=C_PROPOSED, lw=1.0, zorder=5)
+    ax.plot(xs, [wy+0.55]*6, "-", color=C_BASE1, lw=1.0, zorder=5)
+    ax.text(wx-0.06, wy+1.45, "nav", ha="right", va="center", fontsize=6.3,
+            color=C_PROPOSED)
+    ax.text(wx-0.06, wy+0.55, "comp.", ha="right", va="center", fontsize=6.3,
+            color=C_BASE1)
+    # future-corrects-past curved arrow
+    ax.add_patch(FancyArrowPatch((wx+ww-0.7, wy+1.0), (wx+0.7, wy+1.0),
+                 connectionstyle="arc3,rad=0.45", arrowstyle="-|>",
+                 mutation_scale=9, lw=1.0, color="0.4"))
+    ax.text(wx+ww*0.5, wy+0.06, "future data corrects the past",
+            ha="center", va="center", fontsize=6.3, color="0.45",
+            style="italic")
+
+    arrow(10.15, 2.6, 10.85, 2.6, color="0.5", lw=1.4)
+
+    # ===== Panel (c): bounded navigation =====
+    title(13.2, "(c) bounded navigation,\nno neural network")
+    px, py, pw, ph = 11.15, 1.15, 3.9, 2.05
+    ax.add_patch(Rectangle((px, py), pw, ph, fc="white", ec=NEUT_EC, lw=0.9))
+    tt = np.linspace(0, 1, 100)
+    # causal filter: grows and diverges
+    div = py + 0.18 + (ph-0.2) * (tt**1.7) * 1.35
+    div = np.clip(div, py, py+ph)
+    ax.plot(px+0.12+tt*(pw-0.24), div, "--", color=C_BASE1, lw=1.5)
+    # proposed: bounded, low
+    prop = py + 0.30 + 0.16*np.sin(tt*9) + 0.05
+    ax.plot(px+0.12+tt*(pw-0.24), prop, "-", color=C_PROPOSED, lw=2.0)
+    ax.annotate("causal filter\n(cold start)", (px+pw*0.40, py+ph*0.90),
+                fontsize=6.3, color=C_BASE1, ha="center", va="center")
+    ax.annotate("proposed", (px+pw*0.66, py+0.30), fontsize=6.6,
+                color=C_PROPOSED, ha="center", va="bottom")
+    ax.annotate("", xy=(px+pw, py), xytext=(px, py),
+                arrowprops=dict(arrowstyle="-|>", lw=0.9, color="0.5"))
+    ax.text(px+pw-0.05, py-0.16, "time", ha="right", va="top", fontsize=6.3,
+            color="0.45")
+    ax.text(px-0.12, py+ph*0.5, "error", ha="right", va="center",
+            fontsize=6.3, color="0.45", rotation=90)
+
+    fig.savefig(os.path.join(OUT, "fig_concept.pdf"))
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     fig_breadth(); fig_coldstart(); fig_factorgraph(); fig_window(); fig_pipeline()
-    fig_winlen(); fig_obs()
+    fig_winlen(); fig_obs(); fig_concept()
     print("wrote figures to", OUT)
     for f in sorted(os.listdir(OUT)):
         print("  ", f)
