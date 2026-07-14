@@ -127,16 +127,10 @@ magnetic signature can be removed in flight.
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.98\textwidth]{figs/fig_concept.pdf}
-\caption{Concept of the study. (a)~A single scalar magnetometer reading mixes the
-anomaly map signal, which carries the aircraft position $\mathbf{p}_t$, with the
-aircraft field, modelled by the time-varying Tolles--Lawson term
-$\mathbf{A}_t^{\top}\boldsymbol{\beta}_t$; position and compensation are therefore
-coupled through the one measurement and must be estimated together. (b)~The proposed
-estimator represents both as variables of a factor graph and solves them jointly
-over a fixed-lag sliding window, so that measurements after a given epoch still
-correct its navigation and compensation before the estimate is committed. (c)~The
-result is bounded navigation at cold start, using no neural network, where a plain
-online-TL causal filter can diverge.}
+\caption{Concept of the study: (a)~one scalar reading couples aircraft position and
+aircraft-field compensation; (b)~a fixed-lag factor graph estimates both jointly,
+letting later measurements correct earlier states; (c)~bounded cold-start
+navigation, with no neural network.}
 \label{fig:concept}
 \end{figure*}
 
@@ -346,12 +340,9 @@ is the Gaussian density; and $\lVert\mathbf{v}\rVert^2_{\mathbf{M}}=
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.92\textwidth]{figs/fig_pipeline.pdf}
-\caption{Proposed estimator. The INS error state, the three-axis fluxgate
-(Tolles--Lawson basis), and the scalar magnetometer feed a factor graph whose
-variables are the navigation error, the online TL coefficients, and optional
-sensor-error states. A fixed-lag window solves the graph by robust
-Gauss--Newton/QR and outputs position and compensation; the anomaly map enters
-through the map-match factor.}
+\caption{Proposed estimator: the sensors feed a factor graph of navigation,
+online TL compensation, and optional sensor-error variables, solved over a
+fixed-lag window.}
 \label{fig:pipeline}
 \end{figure*}
 
@@ -578,18 +569,10 @@ results in Section~\ref{sec:results}-C.
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.96\textwidth]{figs/fig_graph.pdf}
-\caption{Factor graph of one window, with every estimated variable and measurement
-shown. Top: the 18-state INS error chain $\mathbf{x}_t$
-of~\eqref{eq:state}, linked by Pinson--FOGM process factors driven by the INS
-mechanization. Bottom: the time-varying Tolles--Lawson coefficient chain
-$\boldsymbol{\beta}_t$, linked by random-walk factors $\mathbf{Q}^{\beta}$. Each
-scalar-magnetometer factor (blue) applies the robust residual
-of~\eqref{eq:resid}, coupling $\delta\mathbf{p}_t$, $S_t$, and
-$\boldsymbol{\beta}_t$; the joint prior (left) is $\mathbf{P}_0$ at cold start or
-the covariance carried from the previous window. Dashed arrows mark known factor
-parameters (INS mechanization, fluxgate basis $\mathbf{A}_t$, map $h,\nabla h$);
-the dashed node $\boldsymbol{\theta}$ holds the optional sensor-error variables of
-Section~\ref{sec:method}-F.}
+\caption{Factor graph of one window: the 18-state INS error chain $\mathbf{x}_t$ and
+the time-varying TL chain $\boldsymbol{\beta}_t$, coupled by robust
+scalar-magnetometer factors. Dashed arrows are known factor parameters; the dashed
+node $\boldsymbol{\theta}$ holds the optional sensor-error variables.}
 \label{fig:graph}
 \end{figure*}
 
@@ -619,9 +602,9 @@ constant in the line length, giving overall linear complexity.
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\columnwidth]{figs/fig_window.pdf}
-\caption{Fixed-lag sliding window. Each window commits its leading stride and passes
-the full smoothed state and covariance forward as the prior for the next window; the
-trailing overlap provides bounded smoother look-ahead.}
+\caption{Fixed-lag sliding window: each window commits its leading stride and
+carries the smoothed state and covariance to the next; the overlap is the
+look-ahead.}
 \label{fig:window}
 \end{figure}
 
@@ -754,12 +737,9 @@ the INS dynamics.
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\columnwidth]{figs/fig_obs.pdf}
-\caption{Observability of joint compensation and navigation
-(Proposition~\ref{prop:obs}). Left: when the map-gradient subspace
-range$(\mathbf{G})$ and the compensation subspace range$(\boldsymbol{\Psi})$ meet
-only at the origin, position and compensation are separable. Right: when they share
-a nonzero direction, a position shift can be masked by a compensation change and
-observability collapses.}
+\caption{Observability geometry (Proposition~\ref{prop:obs}): position and
+compensation are separable when range$(\mathbf{G})$ and range$(\boldsymbol{\Psi})$
+meet only at the origin (left) and confounded when they share a direction (right).}
 \label{fig:obs}
 \end{figure}
 
@@ -930,9 +910,8 @@ produced by continuous-integration scripts on the code branch and are reproducib
 from it.
 
 \begin{table}[t]
-\caption{Estimator settings used for all cold-start results (values from the
-released code). The same $\mathbf{P}_0$, $\mathbf{Q}$, $R$, and TL settings drive
-both the causal EKF and the window smoother.}
+\caption{Estimator settings for all cold-start results; the same $\mathbf{P}_0$,
+$\mathbf{Q}$, $R$, and TL settings drive both the EKF and the smoother.}
 \label{tab:params}
 \centering
 \footnotesize
@@ -956,88 +935,26 @@ Gauss--Newton & max.\ iter.\ / tol. & 5 / $10^{-4}$ \\
 \end{tabular}
 \end{table}
 
-\subsection{Batch estimator on real data}
-We first validate the estimator on survey line 1003.02, from the
-crustal-field measurement flight Flt1003 (\SI{63}{\minute}), with the compensated
-stinger magnetometer. This is a deliberately controlled check rather than the
-navigation demonstration: because the interference is already removed, the
-comparison isolates the estimator and solver from the cold-start compensation
-problem; the navigation showcase proper is the free-flight line 1007.06 of
-Section~\ref{sec:results}-C. The batch factor graph improves horizontal DRMS
-from the EKF's \SI{28.3}{\meter} to \SI{14.0}{\meter} (Huber kernel), against
-\SI{114.6}{\meter} free-inertial, a \SI{51}{\percent} reduction over the EKF.
-Fig.~\ref{fig:map} shows the anomaly map and the flight line, with a zoom on the
-fine anomaly structure the map-matching factor exploits; the estimator comparison
-itself is carried by the error and CDF plots below rather than the map, since a
-metre-level track error is not resolvable at map scale.
-Fig.~\ref{fig:poserr} plots the horizontal error over the line:
-the FGO estimate (blue) stays below the EKF (red) for essentially the entire flight,
-the shaded region marking the improvement. Fig.~\ref{fig:cdf} gives the empirical
-error distribution: the FGO curve reaches its 95th percentile at less than
-half the error of the EKF, and both bound the free-inertial error by an order of
-magnitude. On a \SI{10}{\minute} segment the iterated-RTS and sparse-GN/QR solvers
-agree to within \SI{1}{\meter} (Table~\ref{tab:bench}), confirming that both
-numerically reach the same MAP estimate as predicted by Lemma~\ref{lem:rts}. The
-Huber kernel changes the batch result by less than \SI{0.3}{\meter} here, as
-expected for the already-compensated stinger sensor whose residuals are close to
-Gaussian; its value appears in the cold-start cases below, where transient outliers
-are large.
-
-\begin{table}[t]
-\caption{Batch estimator on survey line 1003.02 (Flt1003 measurement flight,
-compensated stinger), a controlled estimator/solver check, not the navigation
-result; horizontal DRMS [m]. Free-inertial reference \SI{114.6}{\meter}. The RTS
-and GN/QR solvers agree, confirming a common MAP estimate.}
-\label{tab:bench}
-\centering
-\begin{tabular}{llr}
-\toprule
-Segment & Estimator & DRMS \\
-\midrule
-full line & EKF & 28.3 \\
-full line & FGO (RTS) & 14.3 \\
-full line & \textbf{FGO (RTS, Huber)} & \textbf{14.0} \\
-\midrule
-\SI{10}{\minute} & EKF & 47.9 \\
-\SI{10}{\minute} & FGO (RTS) & 18.4 \\
-\SI{10}{\minute} & FGO (GN/QR) & 19.4 \\
-\SI{10}{\minute} & FGO (GN/QR, Huber) & 18.4 \\
-\bottomrule
-\end{tabular}
-\end{table}
+For geographic context, Fig.~\ref{fig:map} shows line 1003.02 over the Eastern
+anomaly field. As a controlled check on the compensated stinger, before the
+cold-start problem, the batch factor graph tightens the horizontal DRMS from the
+EKF's \SI{28.3}{\meter} to \SI{14.0}{\meter}, against \SI{114.6}{\meter}
+free-inertial (Fig.~\ref{fig:poserr}); its iterated-RTS and sparse-GN/QR solvers
+agree to within \SI{1}{\meter}, an empirical check of Lemma~\ref{lem:rts}.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\columnwidth]{figs/fig_map.pdf}
-\caption{Eastern anomaly map and survey line 1003.02 (Flt1003 measurement flight),
-providing geographic context; the inset zooms the fine anomaly structure the
-map-matching factor exploits along the line. The estimator comparison is deferred to
-Figs.~\ref{fig:poserr}--\ref{fig:cdf}: at the survey ground speed a
-metre-level track error is smaller than one \SI{12}{\second} sample and cannot
-be resolved on a map.}
+\caption{Line 1003.02 over the Eastern anomaly map.}
 \label{fig:map}
 \end{figure}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\columnwidth]{figs/fig_poserr.pdf}
-\caption{Horizontal position error on survey line 1003.02 (Flt1003). The batch
-factor graph (FGO, blue) holds a tighter bound than the EKF (red) across the line;
-the shaded band
-marks the FGO improvement, and free inertial (INS) diverges. The labelled DRMS
-values are computed over the full line, without the warm-up exclusion of
-Table~\ref{tab:bench}.}
+\caption{Horizontal position error on line 1003.02: batch FGO, EKF, and free
+inertial (DRMS in the legend).}
 \label{fig:poserr}
-\end{figure}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.98\columnwidth]{figs/fig_cdf.pdf}
-\caption{Empirical CDF of horizontal error on survey line 1003.02 (Flt1003; full
-line, as in Fig.~\ref{fig:poserr}). The proposed FGO reaches its 95th percentile at
-less than
-half the EKF's error; both bound the free-inertial error by an order of magnitude.}
-\label{fig:cdf}
 \end{figure}
 
 \subsection{Cold-start line vs.\ online EKF+TL+NN}
@@ -1074,18 +991,13 @@ the balance can shift toward longer windows) is left for the revision.
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.92\columnwidth]{figs/fig_winlen.pdf}
-\caption{Window length versus accuracy on the free-flight navigation line 1007.06
-(Flt1007, cold start), at the three evaluated lengths. The \SI{5}{\minute} window
-balances the
-under-determined \SI{2}{\minute} window against the drift-blind static batch
-(full line).}
+\caption{Window length $L_w$ versus horizontal DRMS on line 1007.06 (cold start).}
 \label{fig:winlen}
 \end{figure}
 
 \begin{table}[t]
-\caption{Cold start on the free-flight navigation line 1007.06 (Flt1007),
-uncompensated cabin magnetometers; DRMS [m]. This is the primary navigation result.
-INS \SI{318}{\meter}; EKF on compensated Mag~1 $\approx\SI{20}{\meter}$.}
+\caption{Cold start on line 1007.06 (Flt1007), uncompensated cabin magnetometers;
+DRMS [m]. INS \SI{318}{\meter}; compensated-Mag~1 EKF $\approx\SI{20}{\meter}$.}
 \label{tab:1007}
 \centering
 \begin{tabular}{lrr}
@@ -1107,9 +1019,8 @@ EKF+TL-only, reported~\cite{hager2026} & 58 & 15 \\
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\columnwidth]{figs/fig_coldstart.pdf}
-\caption{Free-flight navigation line 1007.06 (Flt1007), cold start on the
-uncompensated cabin magnetometers. The NN-free fixed-lag window (left of the
-divider) compares against the reimplemented and reported EKF+TL+NN (shaded, right).}
+\caption{Cold start on line 1007.06: NN-free fixed-lag window (left) versus the
+reimplemented and reported EKF+TL+NN (right).}
 \label{fig:coldstart}
 \end{figure}
 
@@ -1172,11 +1083,9 @@ lines are unpublished, so the comparison is against a faithful, not the
 authors', filter.
 
 \begin{table}[t]
-\caption{Breadth: cold-start cabin magnetometers, DRMS [m], on the SGL~2020
-navigation-usable lines. ``Purpose'': FF = free-flight (Flt1007), SV = survey
-traverse (Flt1003). ``div.''\ = divergence $>\SI{10}{\kilo\meter}$; ``err.''\ = run
-left the map. Bold = best of the three baselines. The short calibration-maneuver
-line 1006.08 (Flt1006) is set aside and not tabulated (see text).}
+\caption{Breadth: cold-start cabin magnetometers, DRMS [m]. Purpose FF = free-flight
+(Flt1007), SV = survey (Flt1003); ``div.''\ $>\SI{10}{\kilo\meter}$, ``err.''\ = off
+map; bold = best of three. Calibration line 1006.08 set aside (see text).}
 \label{tab:breadth}
 \centering
 \setlength{\tabcolsep}{3pt}
@@ -1202,11 +1111,8 @@ Line & Purp. & Map & [km] & Mag & online & TL+NN & win \\
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.92\columnwidth]{figs/fig_breadth.pdf}
-\caption{Breadth study (Table~\ref{tab:breadth}) on a log DRMS axis: weak online-TL
-EKF (gray, hatched where it diverges beyond \SI{10}{\kilo\meter}), strong
-EKF+TL+NN (red), and the NN-free FGO window (blue). The NN keeps the causal filter
-bounded; the window matches that and is best of the three on all \num{8} full-length
-cases. The short calibration line 1006.08 is set aside and not shown (see text).}
+\caption{Breadth study (Table~\ref{tab:breadth}), log DRMS axis: online-TL EKF
+(gray), EKF+TL+NN (red), and the NN-free FGO window (blue).}
 \label{fig:breadth}
 \end{figure}
 
@@ -1288,9 +1194,8 @@ functional form, so it demonstrates that the graph formulation can carry and
 recover such states, not that these models capture real sensor behavior.
 
 \begin{table}[t]
-\caption{Sensor-error factors (simulation), enabled cumulatively; horizontal DRMS
-[m]. Free-inertial reference \SI{31.1}{\meter}. Values for the non-robust solver;
-the Huber solver agrees within \SI{2}{\meter}.}
+\caption{Sensor-error factors (simulation), enabled cumulatively; DRMS [m].
+Free-inertial \SI{31.1}{\meter}; non-robust solver (Huber within \SI{2}{\meter}).}
 \label{tab:sensor}
 \centering
 \begin{tabular}{lr}
@@ -1345,21 +1250,16 @@ safe direction in which to err.
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\columnwidth]{figs/fig_consistency.pdf}
-\caption{Monte-Carlo consistency. Per-axis two-degree-of-freedom
-horizontal-position NEES against time for a representative simulated run, for the
-causal EKF and the batch factor graph, with the \SI{95}{\percent} $\chi^2_2$ band
-shaded and the ideal value \num{2} dotted. Both estimators stay inside the band, so
-neither reported covariance is over-confident.}
+\caption{Monte-Carlo position NEES versus time (EKF and batch FGO) with the
+\SI{95}{\percent} $\chi^2_2$ band; both stay inside it (ideal \num{2}, dotted).}
 \label{fig:consistency}
 \end{figure}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\columnwidth]{figs/fig_sigma.pdf}
-\caption{Covariance envelope. North and East position error for a representative
-simulated factor-graph run inside the estimator $\pm2\sigma$ bands. The error stays
-within the reported uncertainty throughout, consistent with the conservative ANEES
-of \num{1.5}.}
+\caption{North and East position error within the estimator $\pm2\sigma$ bands
+(representative simulated FGO run).}
 \label{fig:sigma}
 \end{figure}
 
