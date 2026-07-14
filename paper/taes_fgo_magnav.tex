@@ -178,7 +178,8 @@ platform currents and other non-rigid, non-attitude sources contribute a large
 fraction of the field that no set of Tolles--Lawson
 coefficients can represent~\cite{gnadt2022}. This has motivated a line of
 learning-augmented compensation on this dataset: neural-network heading-error and
-denoising models~\cite{williams1993,gnadt2022}, and the online EKF+TL+NN whose
+denoising models~\cite{williams1993,gnadt2022}, physics-informed
+liquid-time-constant networks~\cite{nerrise2024}, and the online EKF+TL+NN whose
 residual network mops up exactly this un-modeled remainder~\cite{hager2026}. The
 scalar optically-pumped magnetometers used for the cabin channels add their own
 orientation-dependent errors (heading error and equatorial dead
@@ -243,10 +244,14 @@ fusion~\cite{indelman2013}, and modern visual--inertial estimators~\cite{qin2018
 have brought the approach firmly into navigation. Despite these advances,
 factor-graph estimation in navigation has been developed almost entirely for
 visual--inertial odometry and simultaneous localization and mapping, where the
-estimated quantities are poses and landmarks; it has not been brought to bear on
-joint online aeromagnetic compensation and map matching, and the
-observability of estimating a compensation model jointly with position from map
-matching has not been characterized.
+estimated quantities are poses and landmarks. The factor graph has very recently
+reached aeromagnetic compensation itself: Lathrop et al.~\cite{lathrop2024}
+calibrate a magnetometer by fusing vector and scalar magnetometers with inertial
+measurements in a factor graph, absorbing large permanent moments and a
+time-varying external field. That work compensates the sensor but does not close
+the loop to navigation. The joint problem, estimating a time-varying compensation
+together with aircraft position from map matching, has not been posed in a factor
+graph, and the observability of doing so has not been characterized.
 
 % P6.5: Synthesis of the gap
 Taken together, the three lines leave a specific gap. The cold-start MagNav problem
@@ -855,52 +860,32 @@ features (Section~\ref{sec:baseline}) is necessary for the baseline to converge.
 \end{remark}
 
 \section{Reimplemented Online EKF+TL+NN Baseline}\label{sec:baseline}
-To compare against~\cite{hager2026} on equal footing we reimplement, rather
-than merely cite, the online EKF+TL+NN cold start. The filter augments the Pinson
-error state with the online TL coefficients $\boldsymbol{\beta}$ and the weights of
-a small feed-forward network, all propagated as EKF states and updated online
-against \eqref{eq:meas}. Because neither the network architecture nor the
-natural-gradient training design of~\cite{hager2026} is released, ours is a
-reimplementation of the published design principles, not a line-for-line
-replication. Naively initialized, the reimplementation diverged; three fixes, each
-addressing a distinct and independently diagnosed failure, were required.
+To compare against~\cite{hager2026} on equal footing we reimplement, rather than
+merely cite, its online EKF+TL+NN cold start. The filter augments the Pinson error
+state with the online TL coefficients $\boldsymbol{\beta}$ and the weights of a
+small feed-forward network, all propagated as EKF states and updated online
+against~\eqref{eq:meas}. Since neither the network architecture nor the training
+design of~\cite{hager2026} is released, ours reproduces the published design
+principles rather than the exact filter.
 
-(i) Bias-free network with DC initialization. The map returns the anomaly
-only, whereas the raw scalar reading includes a large constant offset. Left in the
-regression target, this offset drove the network output bias to
-$\sim\!5\times10^{4}$\,nT and the filter to \texttt{NaN}. We remove the mean by a
-short initial window, initializing the network output bias to the median
-measured-minus-predicted offset and scaling the target by its standard deviation.
+A naive port diverged, and three fixes, each addressing an independently diagnosed
+failure, were needed. (i)~We remove the large constant offset from the regression
+target and initialize the network output bias to it, because the raw offset
+($-1724\,\mathrm{nT}$ on Mag~4, $+310\,\mathrm{nT}$ on Mag~5) otherwise drives the
+network bias to $\sim\!5\times10^{4}$\,nT and the filter to \texttt{NaN}. (ii)~We
+restrict the network inputs to the attitude-derived TL basis, because feeding the
+scalar magnetometer creates the endogenous feature of the Remark above and collapses
+horizontal position (Corollary~\ref{cor:exo}). (iii)~We inflate the measurement
+variance and the coefficient process noise through the warm-up, when the
+compensation is still grossly wrong, then relax them.
 
-(ii) Exogenous network inputs only. Using the scalar magnetometer as a
-network input creates exactly the endogenous feature of the Remark above: the
-network learns to reproduce the map and horizontal position collapses (we observed
-$>5$\,km error with a small measurement residual). Restricting the inputs to the
-attitude-derived TL basis restores observability, in direct agreement with
-Corollary~\ref{cor:exo}.
-
-(iii) De-trusting the map through the transient. During the cold-start
-transient the compensation is grossly wrong, so the map residual is unreliable; we
-inflate the measurement variance and the coefficient process noise for the warm-up,
-then relax them.
-
-Concretely, the reimplemented filter augments the navigation state with the
-permanent TL group and a single-hidden-layer network of eight units acting on that
-group, giving \num{41} network-weight states carried in the EKF; the FOGM
-disturbance state uses a $(\sigma,\tau)$ of
-$(\SI{3}{\nano\tesla},\SI{180}{\second})$ and the measurement variance is
-$12^2\,\mathrm{nT}^2$ after warm-up. The DC-removal step measures an interference
-offset of, e.g., $-1724\,\mathrm{nT}$ on Mag~4 and $+310\,\mathrm{nT}$ on Mag~5,
-which if left in the target is what drove the untreated filter to divergence. With
-these three fixes the filter reaches \num{40.0}/\SI{17.5}{\meter} on Mag~4/5
-(Table~\ref{tab:1007}): on Mag~4 this lies inside the
-\SIrange{37}{58}{\meter} band spanned by the reported TL-only and TL+NN results,
-while on Mag~5 it is \SIrange{2.5}{3.5}{\meter} above the reported values
-(\SIrange{14}{15}{\meter}), a functioning, close, but not exact reimplementation.
-Its late-half residual falls to \SIrange{117}{231}{\nano\tesla}, and we use it as
-the baseline. We stress that the network only compensates; the fixes are
-what make it observable jointly with position, which is the same requirement
-Corollary~\ref{cor:exo} places on our own compensation features.
+The reimplemented filter carries the permanent TL group and a single-hidden-layer
+network of eight units on that group (\num{41} network-weight states), with a FOGM
+$(\sigma,\tau)=(\SI{3}{\nano\tesla},\SI{180}{\second})$ and post-warm-up measurement
+variance $12^2\,\mathrm{nT}^2$. It reaches \num{40.0}/\SI{17.5}{\meter} on Mag~4/5
+(Table~\ref{tab:1007}): inside the reported \SIrange{37}{58}{\meter} band on Mag~4,
+and \SIrange{2.5}{3.5}{\meter} above the reported \SIrange{14}{15}{\meter} on Mag~5.
+This is a functioning but not exact reimplementation, which we use as the baseline.
 
 \section{Experiments and Results}\label{sec:results}
 
