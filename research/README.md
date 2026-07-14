@@ -26,6 +26,7 @@ and reproducible simulations.
 | `research/paper_baseline.jl` | — | line 1007.06: our FGO-online (static + sliding-window TL) vs Hager et al. (2026) cited DRMS. |
 | `research/paper_impl.jl` | — | **re-runs** the paper's online EKF+TL+NN (`ekf_online_nn`) cold start on line 1007.06 — a genuine reproduced baseline (Mag 4 40.0 m, Mag 5 17.5 m). |
 | `research/fgo_breadth.jl` | — | **breadth**: window FGO vs causal EKF-online on 5 lines / 3 flights / 2 maps, cold-start cabin mags (§2b). The paper reports the 4 navigation/survey lines (8 cases, FGO best of 3 on 8/8) and sets aside the 14-min calibration line 1006.08. Baselines: weak (online-TL EKF) + strong (EKF+TL+NN); NN-free. |
+| `research/fgo_montecarlo.jl` | — | **consistency & significance**: 30-seed simulation Monte-Carlo (fixed sim trajectory, per-seed INS-error + clean-measurement re-draw) of EKF vs batch FGO. Reports DRMS mean±95% CI (FGO 7.4±1.6 vs EKF 9.3±1.3 m) and per-axis 2-DOF position ANEES (FGO 1.54, EKF 1.11; ideal 2 → both conservative, neither over-confident). Real lines are single-realization so MC is simulation-only. Outputs `montecarlo_{summary,nees,sigma}.csv`. |
 | `research/fgo_sensor_ablation.jl` | 154 | factorial sensor-error ablation with injected-truth recovery. |
 | `research/fgo_tracks.jl` | 131 | geographic map+track and position-error figures. |
 | `.github/workflows/fgo_research.yml` | — | CI: test suite + all three research scripts on every push. |

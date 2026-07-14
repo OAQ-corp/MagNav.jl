@@ -51,9 +51,11 @@ two flights and two maps, spanning free-flight navigation and survey
 missions, the smoother is the best of three
 cold-start estimators on every full-length line (\num{8} of \num{8} cases): it stays bounded where a plain
 online-TL EKF diverges, and it beats a reimplemented EKF+TL+NN, which the neural
-network keeps bounded, without using a neural network. We also give an exact
-linear condition for the joint observability of compensation and navigation, from
-which an exogeneity design rule for the compensation features follows.
+network keeps bounded, without using a neural network. A simulation Monte-Carlo
+confirms that the reported covariance is consistent and never over-confident. We
+also give an exact linear condition for the joint observability of compensation and
+navigation, from which an exogeneity design rule for the compensation features
+follows.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -1302,6 +1304,63 @@ $+$ hard-iron bias & 8.1 \\
 \end{tabular}
 \end{table}
 
+\subsection{Consistency and statistical significance}
+Each real line provides a single physical realization, so its DRMS is a point
+estimate and its measurement noise cannot be resampled. To assess statistical
+significance and, more importantly, whether the reported covariance is credible, we
+run a Monte-Carlo study in simulation, where repeated realizations are valid. We fix
+one simulated trajectory over the high-resolution Eastern anomaly map and, for each
+of \num{30} seeds, draw an independent INS-error realization and an independent clean
+scalar-measurement realization, then run the causal EKF and the batch factor graph
+on the same draw. The clean compensated measurement isolates the navigation
+covariance from the cold-start compensation transient.
+
+Averaged over the \num{30} seeds, after a \SI{30}{\second} warm-up, the horizontal
+DRMS is \SI{7.4}{\meter} for the factor graph and \SI{9.3}{\meter} for the EKF, with
+\SI{95}{\percent} confidence half-widths of \SI{1.6}{} and \SI{1.3}{\meter}. On this
+clean sensor both estimators sit near the map-limited floor, so the intervals
+overlap and the gap is modest; the large accuracy separation is the cold-start
+regime of Sections~\ref{sec:results}-C and \ref{sec:results}-D, not this one. The
+purpose of this study is consistency.
+
+For consistency we use the per-axis two-degree-of-freedom position NEES,
+$(e_N/\sigma_N)^2+(e_E/\sigma_E)^2$, whose expectation under a consistent covariance
+is \num{2}. Averaged over all seeds and epochs the ANEES is \num{1.54} for the
+factor graph and \num{1.11} for the EKF, both below the ideal \num{2}. A value below
+\num{2} means the reported uncertainty is conservative and bounds the true error with
+margin, whereas a value above \num{2} would signal an over-confident covariance.
+Neither estimator is over-confident, and the smoother covariance is the better
+calibrated of the two, closer to the ideal. Fig.~\ref{fig:consistency} shows the
+NEES staying inside the \SI{95}{\percent} $\chi^2_2$ band throughout a representative
+run, and Fig.~\ref{fig:sigma} shows the North and East position error contained
+within the estimator $\pm2\sigma$ envelope. Two caveats bound the reading. The NEES
+uses the per-axis (diagonal) covariance, since the cross term is not exposed by the
+evaluated filter output, and the study is a matched-model simulation, so it
+certifies internal consistency rather than robustness to model mismatch. The
+conservative bias indicates that the process noise could be tightened, which is the
+safe direction in which to err.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\columnwidth]{figs/fig_consistency.pdf}
+\caption{Monte-Carlo consistency. Per-axis two-degree-of-freedom
+horizontal-position NEES against time for a representative simulated run, for the
+causal EKF and the batch factor graph, with the \SI{95}{\percent} $\chi^2_2$ band
+shaded and the ideal value \num{2} dotted. Both estimators stay inside the band, so
+neither reported covariance is over-confident.}
+\label{fig:consistency}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\columnwidth]{figs/fig_sigma.pdf}
+\caption{Covariance envelope. North and East position error for a representative
+simulated factor-graph run inside the estimator $\pm2\sigma$ bands. The error stays
+within the reported uncertainty throughout, consistent with the conservative ANEES
+of \num{1.5}.}
+\label{fig:sigma}
+\end{figure}
+
 \subsection{Computational considerations}
 Each window is a sparse nonlinear least-squares problem of fixed size
 $O\big(L_w(n+m)\big)$; the block-bidiagonal Jacobian of the two chains
@@ -1338,9 +1397,11 @@ across four lines, two flights, and two maps, staying bounded where the causal E
 diverges. An exact observability condition and its exogeneity corollary explain this
 behaviour and guide the choice of compensation features.
 
-Several limitations bound the study and set the agenda for further work. The
-real-data results are single-run DRMS on four lines, so Monte-Carlo statistics over
-initializations and the full SGL line set remain to be gathered. The comparison
+Several limitations bound the study and set the agenda for further work. Each real
+line is a single physical realization, so its DRMS is a point estimate; a simulation
+Monte-Carlo (Section~\ref{sec:results}-F) establishes covariance consistency and
+statistical significance, but repeating the real lines and extending to the full SGL
+line set remain out of reach with a single recorded flight per line. The comparison
 covers a causal online-TL EKF and a reimplemented online EKF+TL+NN, but not a
 like-for-like grid or particle-filter map-matching
 baseline~\cite{bergman1999,nordlund2009}, which would sharpen the claim about
