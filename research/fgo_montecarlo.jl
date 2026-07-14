@@ -72,24 +72,15 @@ println("map: $map_used | N=$N epochs | dt=$(traj.dt) s | N_MC=$N_MC seeds")
 
 mask = (traj.tt .- traj.tt[1]) .>= WARM
 
-function drms_of(ins, fr)
-    dn = dlat2dn.(ins.lat .+ fr.x[1,:] .- traj.lat, traj.lat)
-    de = dlon2de.(ins.lon .+ fr.x[2,:] .- traj.lon, traj.lat)
-    sqrt(mean((dn.^2 .+ de.^2)[mask]))
-end
+# run_filt returns a FILTout with metre-space position error (n_err,e_err) and the
+# estimator +/-1 sigma (n_std,e_std) already mapped to metres from the covariance.
+drms_of(fo) = sqrt(mean((fo.n_err.^2 .+ fo.e_err.^2)[mask]))
 
-# per-epoch 2-DOF horizontal-position NEES (native rad coordinates)
-function nees_series(ins, fr)
-    e1 = ins.lat .+ fr.x[1,:] .- traj.lat
-    e2 = ins.lon .+ fr.x[2,:] .- traj.lon
-    out = fill(NaN, N)
-    for k = 1:N
-        Pp = fr.P[1:2,1:2,k]
-        e  = [e1[k], e2[k]]
-        out[k] = dot(e, Pp \ e)
-    end
-    return out
-end
+# per-axis (diagonal) 2-DOF horizontal-position NEES; each term is a squared
+# standard normal under a consistent covariance, so E[NEES]=2 and it is compared
+# to the chi-square(2) band. Uses the diagonal std (cross-covariance not exposed
+# by FILTout); reported as a diagonal normalization.
+nees_series(fo) = (fo.n_err ./ fo.n_std).^2 .+ (fo.e_err ./ fo.e_std).^2
 
 ##* Monte-Carlo loop -----------------------------------------------------------
 drms_ekf = Float64[]; drms_fgo = Float64[]
@@ -113,13 +104,12 @@ for s = 1:N_MC
     catch e
         global nfail += 1; @warn("seed $s failed",e); continue
     end
-    push!(drms_ekf, drms_of(ins,fe)); push!(drms_fgo, drms_of(ins,ff))
-    ne = nees_series(ins,fe); nf = nees_series(ins,ff)
+    push!(drms_ekf, drms_of(fe)); push!(drms_fgo, drms_of(ff))
+    ne = nees_series(fe); nf = nees_series(ff)
     append!(nees_ekf_all, ne[mask]); append!(nees_fgo_all, nf[mask])
     if !rep_saved
         global rep_nees_ekf = ne; global rep_nees_fgo = nf
-        fo = MagNav.eval_filt(traj,ins,ff)  # FILTout has n_err/e_err, n_std/e_std
-        global rep_sigma = (fo.n_err, fo.e_err, fo.n_std, fo.e_std)
+        global rep_sigma = (ff.n_err, ff.e_err, ff.n_std, ff.e_std)
         global rep_saved = true
     end
     println("seed $s  EKF DRMS=$(round(drms_ekf[end],digits=1))  ",
