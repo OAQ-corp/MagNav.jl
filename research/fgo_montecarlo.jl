@@ -103,7 +103,7 @@ for s = 1:N_MC
     seed!(1000 + s)
     ins = create_ins(traj; init_pos_sigma=IPOS, init_alt_sigma=IALT,
                      init_vel_sigma=IVEL)
-    mag = create_mag_c(traj.lat, traj.lon, mapS; alt=traj.alt[1], dt=traj.dt,
+    mag = MagNav.create_mag_c(traj.lat, traj.lon, mapS; alt=traj.alt[1], dt=traj.dt,
                        meas_var=MEASV, fogm_sigma=FOGM_S, fogm_tau=FOGM_T,
                        silent=true)
     local fe, ff
