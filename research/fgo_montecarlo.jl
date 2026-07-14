@@ -83,11 +83,17 @@ drms_of(fo) = sqrt(mean((fo.n_err.^2 .+ fo.e_err.^2)[mask]))
 nees_series(fo) = (fo.n_err ./ fo.n_std).^2 .+ (fo.e_err ./ fo.e_std).^2
 
 ##* Monte-Carlo loop -----------------------------------------------------------
-drms_ekf = Float64[]; drms_fgo = Float64[]
-nees_ekf_all = Float64[]; nees_fgo_all = Float64[]
+# Three map-matching estimators on the clean compensated sensor: the causal EKF,
+# the marginalized (Rao-Blackwellized) particle filter already in MagNav.jl, and
+# the batch factor graph. The MPF is a map-matching filter with no online-TL
+# compensation, so it belongs to this clean-sensor comparison, not the cold-start
+# breadth (where it would diverge like the plain EKF).
+const NUM_PART = 1000
+drms_ekf = Float64[]; drms_mpf = Float64[]; drms_fgo = Float64[]
+nees_ekf_all = Float64[]; nees_mpf_all = Float64[]; nees_fgo_all = Float64[]
 nfail = 0
 rep_saved = false
-rep_nees_ekf = Float64[]; rep_nees_fgo = Float64[]   # representative-seed traces
+rep_nees_ekf = Float64[]; rep_nees_mpf = Float64[]; rep_nees_fgo = Float64[]
 rep_sigma = (Float64[],Float64[],Float64[],Float64[])
 
 for s = 1:N_MC
@@ -97,23 +103,28 @@ for s = 1:N_MC
     mag = MagNav.create_mag_c(traj.lat, traj.lon, mapS; alt=traj.alt[1], dt=traj.dt,
                        meas_var=MEASV, fogm_sigma=FOGM_S, fogm_tau=FOGM_T,
                        silent=true)
-    local fe, ff
+    local fe, fm, ff
     try
         fe = run_filt(traj,ins,mag,itp,:ekf;P0=P0,Qd=Qd,R=R,core=false,run_crlb=false)
+        fm = run_filt(traj,ins,mag,itp,:mpf;P0=P0,Qd=Qd,R=R,core=false,
+                      num_part=NUM_PART)
         ff = run_filt(traj,ins,mag,itp,:fgo;P0=P0,Qd=Qd,R=R,core=false,run_crlb=false)
     catch e
         global nfail += 1; @warn("seed $s failed",e); continue
     end
-    push!(drms_ekf, drms_of(fe)); push!(drms_fgo, drms_of(ff))
-    ne = nees_series(fe); nf = nees_series(ff)
-    append!(nees_ekf_all, ne[mask]); append!(nees_fgo_all, nf[mask])
+    push!(drms_ekf, drms_of(fe)); push!(drms_mpf, drms_of(fm))
+    push!(drms_fgo, drms_of(ff))
+    ne = nees_series(fe); nm = nees_series(fm); nf = nees_series(ff)
+    append!(nees_ekf_all, ne[mask]); append!(nees_mpf_all, nm[mask])
+    append!(nees_fgo_all, nf[mask])
     if !rep_saved
-        global rep_nees_ekf = ne; global rep_nees_fgo = nf
+        global rep_nees_ekf = ne; global rep_nees_mpf = nm; global rep_nees_fgo = nf
         global rep_sigma = (ff.n_err, ff.e_err, ff.n_std, ff.e_std)
         global rep_saved = true
     end
-    println("seed $s  EKF DRMS=$(round(drms_ekf[end],digits=1))  ",
-            "FGO DRMS=$(round(drms_fgo[end],digits=1)) m")
+    println("seed $s  EKF=$(round(drms_ekf[end],digits=1))  ",
+            "MPF=$(round(drms_mpf[end],digits=1))  ",
+            "FGO=$(round(drms_fgo[end],digits=1)) m")
 end
 
 nrun = length(drms_ekf)
@@ -128,11 +139,12 @@ winrate = mean(drms_fgo .< drms_ekf)
 (alo,ahi) = aneesband(length(nees_ekf_all))
 
 summ = DataFrame(
-    estimator = ["EKF (causal)","FGO (batch)"],
-    drms_mean = round.([mean(drms_ekf), mean(drms_fgo)],digits=2),
-    drms_ci95 = round.([ci95(drms_ekf), ci95(drms_fgo)],digits=2),
-    drms_std  = round.([std(drms_ekf),  std(drms_fgo)],digits=2),
-    anees     = round.([anees(nees_ekf_all), anees(nees_fgo_all)],digits=3),
+    estimator = ["EKF (causal)","MPF (particle)","FGO (batch)"],
+    drms_mean = round.([mean(drms_ekf), mean(drms_mpf), mean(drms_fgo)],digits=2),
+    drms_ci95 = round.([ci95(drms_ekf), ci95(drms_mpf), ci95(drms_fgo)],digits=2),
+    drms_std  = round.([std(drms_ekf),  std(drms_mpf),  std(drms_fgo)],digits=2),
+    anees     = round.([anees(nees_ekf_all), anees(nees_mpf_all),
+                        anees(nees_fgo_all)],digits=3),
     anees_lo  = round(alo,digits=3),
     anees_hi  = round(ahi,digits=3),
 )
@@ -149,7 +161,8 @@ CSV.write(joinpath(@__DIR__,"montecarlo_summary.csv"), summ)
 
 tt = traj.tt .- traj.tt[1]
 CSV.write(joinpath(@__DIR__,"montecarlo_nees.csv"),
-    DataFrame(t=tt, nees_ekf=rep_nees_ekf, nees_fgo=rep_nees_fgo))
+    DataFrame(t=tt, nees_ekf=rep_nees_ekf, nees_mpf=rep_nees_mpf,
+              nees_fgo=rep_nees_fgo))
 (n_err,e_err,n_std,e_std) = rep_sigma
 CSV.write(joinpath(@__DIR__,"montecarlo_sigma.csv"),
     DataFrame(t=tt, n_err=n_err, e_err=e_err, n_std=n_std, e_std=e_std))

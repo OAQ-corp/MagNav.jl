@@ -507,6 +507,9 @@ def fig_consistency():
     w = max(5, len(t) // 60)
     ax.plot(t, _running_mean(d["nees_ekf"], w), "-", color=C_BASE1, lw=1.3,
             label="EKF (causal)")
+    if "nees_mpf" in d.dtype.names:
+        ax.plot(t, _running_mean(d["nees_mpf"], w), "-", color=C_ACCENT, lw=1.3,
+                label="MPF (particle)")
     ax.plot(t, _running_mean(d["nees_fgo"], w), "-", color=C_PROPOSED, lw=1.7,
             label="FGO (batch)")
     ax.set_yscale("log")
