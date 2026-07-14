@@ -476,9 +476,71 @@ def fig_concept():
     plt.close(fig)
 
 
+RESEARCH = os.path.join(os.path.dirname(__file__), "..", "research")
+
+
+def _running_mean(y, w):
+    w = max(1, int(w)); k = np.ones(w) / w
+    return np.convolve(y, k, mode="same")
+
+
+def fig_consistency():
+    """Monte-Carlo NEES consistency: 2-DOF horizontal-position NEES vs time for
+    the causal EKF and the batch FGO, against the chi-square 95% band. Reads the
+    simulated-flight Monte-Carlo output (research/montecarlo_nees.csv)."""
+    p = os.path.join(RESEARCH, "montecarlo_nees.csv")
+    if not os.path.exists(p):
+        print("  [skip fig_consistency: montecarlo_nees.csv not found]"); return
+    d = np.genfromtxt(p, delimiter=",", names=True)
+    t = d["t"] / 60.0
+    lo, hi, ideal = 0.0506, 7.378, 2.0   # chi2_2 95% two-sided, E[NEES]=2
+    fig, ax = plt.subplots(figsize=(COL_W, 2.2))
+    ax.axhspan(lo, hi, color="0.85", zorder=0, label="95% band ($\\chi^2_2$)")
+    ax.axhline(ideal, color="0.45", lw=0.8, ls=":", zorder=1)
+    w = max(5, len(t) // 60)
+    ax.plot(t, _running_mean(d["nees_ekf"], w), "-", color=C_BASE1, lw=1.3,
+            label="EKF (causal)")
+    ax.plot(t, _running_mean(d["nees_fgo"], w), "-", color=C_PROPOSED, lw=1.7,
+            label="FGO (batch)")
+    ax.set_yscale("log")
+    ax.set_xlabel("time [min]")
+    ax.set_ylabel("position NEES (2 DOF)")
+    ax.set_xlim(t[0], t[-1])
+    ax.text(t[-1], ideal, " ideal 2", fontsize=6.5, color="0.4", va="center")
+    ax.legend(loc="upper right", frameon=False, fontsize=6.6, ncol=2)
+    despine(ax)
+    fig.savefig(os.path.join(OUT, "fig_consistency.pdf"))
+    plt.close(fig)
+
+
+def fig_sigma():
+    """+/-2 sigma covariance envelope on a representative run: North and East
+    position error vs time inside the estimator +/-2 sigma bands (FGO). Reads
+    research/montecarlo_sigma.csv."""
+    p = os.path.join(RESEARCH, "montecarlo_sigma.csv")
+    if not os.path.exists(p):
+        print("  [skip fig_sigma: montecarlo_sigma.csv not found]"); return
+    d = np.genfromtxt(p, delimiter=",", names=True)
+    t = d["t"] / 60.0
+    fig, axs = plt.subplots(2, 1, figsize=(COL_W, 2.9), sharex=True)
+    for ax, err, std, lab in ((axs[0], d["n_err"], d["n_std"], "North"),
+                              (axs[1], d["e_err"], d["e_std"], "East")):
+        ax.fill_between(t, -2*std, 2*std, color=C_PROPOSED, alpha=0.15,
+                        label="$\\pm2\\sigma$")
+        ax.plot(t, err, "-", color=C_PROPOSED, lw=1.1, label="error")
+        ax.axhline(0, color="0.6", lw=0.6)
+        ax.set_ylabel(f"{lab} err [m]")
+        despine(ax)
+    axs[0].legend(loc="upper right", frameon=False, fontsize=6.6, ncol=2)
+    axs[1].set_xlabel("time [min]")
+    axs[1].set_xlim(t[0], t[-1])
+    fig.savefig(os.path.join(OUT, "fig_sigma.pdf"))
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     fig_breadth(); fig_coldstart(); fig_factorgraph(); fig_window(); fig_pipeline()
-    fig_winlen(); fig_obs(); fig_concept()
+    fig_winlen(); fig_obs(); fig_concept(); fig_consistency(); fig_sigma()
     print("wrote figures to", OUT)
     for f in sorted(os.listdir(OUT)):
         print("  ", f)
