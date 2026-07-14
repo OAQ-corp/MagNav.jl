@@ -233,27 +233,34 @@ def fig_window():
 
 
 def fig_winlen():
-    """DRMS vs window length (line 1007.06 cold start) — the U-shaped tradeoff."""
-    wl = [2.0, 5.0, 87.0]           # window length [min]; 87 = whole-line static
-    m4 = [45.9, 37.0, 123.7]
-    m5 = [17.1, 15.1, 68.1]
+    """DRMS vs window length (line 1007.06 cold start): the U-shaped tradeoff,
+    swept densely from the reproducible research/fgo_winlen_results.csv."""
+    p = os.path.join(RESEARCH, "fgo_winlen_results.csv")
+    if os.path.exists(p):
+        d = np.genfromtxt(p, delimiter=",", names=True,
+                          dtype=None, encoding="utf-8")
+        def series(tag):
+            m = d["mag"] == tag
+            w = d["win_min"][m]; y = d["drms"][m]
+            o = np.argsort(w); return w[o], y[o]
+        wl4, m4 = series("Mag 4"); wl5, m5 = series("Mag 5")
+    else:  # fallback (pre-CI) — sparse points
+        wl4 = wl5 = np.array([2.0, 5.0, 87.0])
+        m4 = np.array([45.9, 37.0, 123.7]); m5 = np.array([17.1, 15.1, 68.1])
+    stat = float(max(wl4.max(), wl5.max()))   # static = longest window
     fig, ax = plt.subplots(figsize=(COL_W, 2.15))
-    ax.plot(wl, m4, "o", color=C_PROPOSED, ms=5.5, label="Mag 4", zorder=4)
-    ax.plot(wl, m4, ":", color=C_PROPOSED, lw=1.1, alpha=0.7)
-    ax.plot(wl, m5, "s", color=C_BASE1, ms=5.0, label="Mag 5", zorder=4)
-    ax.plot(wl, m5, ":", color=C_BASE1, lw=1.1, alpha=0.7)
-    for x, y in zip(wl, m4):
-        ax.annotate("%.0f" % y, (x, y), textcoords="offset points",
-                    xytext=(3, 5), fontsize=6.2, color=C_PROPOSED)
+    ax.plot(wl4, m4, "o-", color=C_PROPOSED, ms=4.8, lw=1.1, label="Mag 4", zorder=4)
+    ax.plot(wl5, m5, "s-", color=C_BASE1, ms=4.4, lw=1.1, label="Mag 5", zorder=4)
     ax.set_xscale("log")
-    ax.set_xticks(wl); ax.set_xticklabels(["2", "5", "87\n(static)"])
+    ticks = sorted(set(np.r_[wl4, wl5].tolist()))
+    ax.set_xticks(ticks)
+    ax.set_xticklabels([("%d" % t) if t != stat else "%d\n(static)" % t
+                        for t in ticks])
     ax.set_xlabel("window length $L_w$ [min]")
     ax.set_ylabel("horizontal DRMS [m]")
-    ax.set_ylim(0, 135)
+    ax.set_ylim(0, max(m4.max(), m5.max()) * 1.12)
     ax.grid(True, axis="y")
-    ax.annotate("static\n(whole line)", (87, 123.7), textcoords="offset points",
-                xytext=(-4, -26), fontsize=6.2, color="0.35", ha="right")
-    ax.legend(loc="upper center", frameon=False)
+    ax.legend(loc="upper left", frameon=False)
     despine(ax)
     fig.savefig(os.path.join(OUT, "fig_winlen.pdf"))
     plt.close(fig)
