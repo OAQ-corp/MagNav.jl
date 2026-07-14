@@ -24,36 +24,44 @@ slice of `P`.
 
 ## 2. Tests
 
-### A. Monte-Carlo DRMS with confidence intervals
-- **Design.** For each trial draw a random initial INS error `x0 ~ N(0, P0)` and a
-  fresh measurement-noise realization; TL coefficients stay cold-start (zero).
-  Run all three estimators (online-TL EKF, EKF+TL+NN, FGO window) on the same
-  draw so comparisons are paired.
-- **Coverage.** The 4 counted lines × {Mag 4, Mag 5} = 8 cases. `N` seeds per case.
-- **Metrics.** mean DRMS ± 95% t-interval; paired win-rate P(FGO < both baselines).
-- **Reframes** the "8/8" claim as "lowest mean DRMS with non-overlapping 95% CI on
-  k/8 cases" plus a per-seed win rate — a statistical statement, not a single run.
-- **Outputs.** ± columns added to Table IV (or a companion table); error bars added
-  to `fig_breadth`.
+> **Design correction (important, honesty).** `get_ins` returns the *real* recorded
+> flight INS, so each real SGL line is a single physical realization: its
+> measurement noise cannot be re-drawn, and a classical Monte-Carlo over the real
+> breadth lines would be fabricated. We therefore split the rigor two ways: the
+> repeated-realization statistics (CIs, ANEES, ANIS) are done on **simulated**
+> flights (`create_XYZ0`, the same generator the sensor ablation already uses),
+> where drawing many noise realizations is valid; and on the **real** lines we
+> report the single-realization consistency evidence that is actually available
+> (NEES-vs-time, ±2σ envelope), labelled as single-run.
 
-### B. Filter consistency — NEES + NIS
-- **NEES (is the reported covariance credible?).** Horizontal-position 2-DOF
-  normalized error `ε_t = e_pos,tᵀ (P_pos,t)⁻¹ e_pos,t`, averaged over time and over
-  the `N` MC trials → ANEES, compared to the two-sided 95% χ²₂ consistency interval.
-  ANEES ≫ 2 ⇒ over-confident (optimistic covariance); ≪ 2 ⇒ conservative.
-- **NIS (are innovations consistent?).** Per scalar measurement
-  `ν_t² / S_t`, `S_t = H_t P_t H_tᵀ + R`, 1-DOF, averaged → compared to the 95% χ²₁
-  interval. Detects a mis-scaled `R` or an over-tight map factor.
-- **Comparison.** FGO smoothed covariance vs the EKF, so the plot shows which
-  estimator is self-consistent.
-- **Coverage.** Primary line 1007.06 (both mags) + batch line 1003.02.
-- **Outputs.** `fig_consistency`: NEES-vs-time and NIS-vs-time with χ² bounds; a
-  summary line (ANEES, % of epochs inside the band).
+### A. Simulation Monte-Carlo — DRMS CIs + consistency (rigorous)
+- **Design.** `N` simulated flights from `create_XYZ0`, each with an independent
+  INS-error draw and measurement-noise realization; cold-start TL. Run the EKF and
+  the FGO window on the same draw (paired).
+- **Metrics.**
+  - DRMS: mean ± 95% t-interval for EKF vs FGO; paired win-rate P(FGO < EKF).
+  - **ANEES** (2-DOF horizontal position): `ε = e_posᵀ P_pos⁻¹ e_pos` in the state's
+    native (rad) coordinates so it is unit-free, time-averaged then averaged over
+    the `N` runs, compared to the two-sided 95% χ²₂ interval scaled by `N`.
+    ANEES ≫ 2 ⇒ optimistic covariance; ≪ 2 ⇒ conservative.
+  - **ANIS** (stretch, 1-DOF): scalar innovation `ν_t²/S_t`, `S_t = H_t P_t H_tᵀ + R`.
+    Requires reconstructing the map/TL/FOGM measurement Jacobian `H_t` post hoc; if
+    that reconstruction is not clean, report NEES only and say so.
+- **Outputs.** a Monte-Carlo table (EKF vs FGO DRMS mean±CI, ANEES, win-rate) and
+  `fig_consistency` (ANEES with χ² band; ANIS if available).
 
-### C. ±2σ covariance envelope
-- One representative run (batch line 1003.02, clean compensated sensor): North and
-  East position error vs time with the estimator ±2σ band from `P_pos`. Shows the
-  reported uncertainty actually contains the error.
+### B. Real-data single-run consistency
+- **NEES-vs-time** on the real primary line 1007.06 (both mags) and batch line
+  1003.02: `ε_t = e_pos,tᵀ P_pos,t⁻¹ e_pos,t` from the actual run, with the 95% χ²₂
+  band. Single realization, labelled as such; shows whether the reported covariance
+  is credible on real data (and, by comparison, EKF vs FGO).
+- **Output.** panel in `fig_consistency` or a small companion plot.
+
+### C. ±2σ covariance envelope (real data)
+- Representative real run (batch line 1003.02, clean compensated sensor): North and
+  East position error vs time with the estimator ±2σ band, read directly from the
+  `n_std`/`e_std` that `eval_filt` already computes from `P`. Shows the reported
+  uncertainty contains the error.
 - **Output.** `fig_sigma` (2-panel N/E error with ±2σ).
 
 ### D. (optional, if CI budget allows)
@@ -75,10 +83,13 @@ one is not. Either outcome is reported, never suppressed.
    and reuse each line's loaded `XYZ` across seeds; log wall-clock and `N`.
 3. Figures: `fig_consistency`, `fig_sigma`, and error bars on `fig_breadth`
    (in `make_figures.py` / `plot_tracks.py`), all in the existing dataviz style.
-4. Manuscript: new Results subsection "Consistency and statistical significance";
-   add the MC ± values and the NEES/NIS/±2σ evidence; update the abstract to state
-   the results are Monte-Carlo with CIs; remove the matching sentence from the
-   Conclusion's limitations. Update `research/README.md` provenance.
+4. Manuscript: new Results subsection "Consistency and statistical significance"
+   holding the simulation MC (DRMS CIs, ANEES) and the real-data single-run NEES /
+   ±2σ evidence. The real breadth stays single-run (one physical realization per
+   line, stated plainly); the abstract/claims gain the simulation CIs and the
+   consistency result, not a false "Monte-Carlo on real data". Soften the matching
+   Conclusion limitation instead of deleting it (single-realization real data is
+   inherent). Update `research/README.md` provenance.
 
 ## 5. Compute scope and the one decision needed
 A fixed-lag smoother over `N` seeds × 8 cases is the cost driver. Proposed scope:
