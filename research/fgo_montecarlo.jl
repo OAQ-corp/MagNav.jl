@@ -40,6 +40,7 @@ const IALT   = 0.001
 const CHI2_2_LO, CHI2_2_HI = 0.05064, 7.37776   # 2 DOF (per-epoch NEES band)
 
 ##* one simulated trajectory over a real high-resolution map --------------------
+seed!(20)   # fix the trajectory draw so the reported numbers are reproducible
 try
     df_map = DataFrame(CSV.File(joinpath(@__DIR__,"..","examples","dataframes","df_map.csv")))
     df_map[!,:map_name] = Symbol.(df_map[!,:map_name])
