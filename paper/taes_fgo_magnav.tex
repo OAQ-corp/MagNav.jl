@@ -1,7 +1,7 @@
-%% IEEE TAES manuscript draft.
-%% Build: pdflatex -> bibtex -> pdflatex x2. Requires IEEEtran.cls.
+%% IEEE TAES manuscript (official IEEEtaes.cls + IEEEtaes.bst, both in this dir).
+%% Build: pdflatex -> bibtex -> pdflatex x2.
 %% Citation integrity: python check_citations.py . --no-net
-\documentclass[journal]{IEEEtran}
+\documentclass{IEEEtaes}
 
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{graphicx}
@@ -13,6 +13,13 @@
 \usepackage{algpseudocode}
 \usepackage{pifont}
 
+\jvol{XX}
+\jnum{XX}
+\jmonth{XXXXX}
+\paper{1234567}
+\pubyear{2026}
+\doiinfo{TAES.2026.Doi Number}
+
 \newtheorem{proposition}{Proposition}
 \newtheorem{corollary}{Corollary}
 \newtheorem{lemma}{Lemma}
@@ -22,19 +29,28 @@
 
 \begin{document}
 
-\title{Factor-Graph Aeromagnetic Compensation for\\
-Airborne Magnetic-Anomaly Navigation}
+\title{Factor-Graph Aeromagnetic Compensation for Airborne Magnetic-Anomaly Navigation}
 
-\author{Jayden~Dongwoo~Lee%
-\thanks{J.~D.~Lee is with the Korea Advanced Institute of Science and
-Technology (KAIST), Daejeon 34141, Republic of Korea
-(e-mail: cin6474@kaist.ac.kr).}%
-\thanks{Reproducible code and experiments are provided in the MagNav.jl
-research branch \texttt{claude/fgo-problem-research-bllgbr}.}}
+\author{Jayden Dongwoo Lee}
+\affil{Korea Advanced Institute of Science and Technology, Daejeon, Korea}
 
-\markboth{IEEE Transactions on Aerospace and Electronic Systems (draft)}%
-{Lee: Factor-Graph Aeromagnetic Compensation for Magnetic-Anomaly Navigation}
+\author{Bohyun Chang}
+\affil{Korea Advanced Institute of Science and Technology, Daejeon, Korea}
 
+\author{Hyochoong Bang}
+\member{Member, IEEE}
+\affil{Korea Advanced Institute of Science and Technology, Daejeon, Korea}
+
+\receiveddate{Manuscript received XXXXX 00, 0000; revised XXXXX 00, 0000; accepted XXXXX 00, 0000.}
+
+\corresp{{\itshape (Corresponding author: H. Bang)}.}
+
+\authoraddress{J. D. Lee, B. Chang, and H. Bang are with the Department of Aerospace Engineering, Korea Advanced Institute of Science and Technology, Daejeon 34141, Republic of Korea (e-mail: \href{mailto:cin6474@kaist.ac.kr}{cin6474@kaist.ac.kr}; \href{mailto:hcbang@kaist.ac.kr}{hcbang@kaist.ac.kr}).}
+
+\editor{}
+\supplementary{}
+
+\markboth{LEE ET AL.}{FACTOR-GRAPH AEROMAGNETIC COMPENSATION FOR MAGNETIC-ANOMALY NAVIGATION}
 \maketitle
 
 \begin{abstract}
@@ -1467,7 +1483,31 @@ is precisely why we carry it as a graph variable.
 The experiments use the publicly released SGL~2020 challenge
 dataset~\cite{gnadt2020}.
 
-\bibliographystyle{IEEEtran}
+\begin{biography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{figs/author_lee.png}}]{Jayden Dongwoo Lee}
+received the M.S. degree in aerospace engineering from the Korea Advanced Institute
+of Science and Technology (KAIST), Daejeon, South Korea, in 2021. He is currently
+pursuing the Ph.D. degree in aerospace engineering at KAIST. His research interests
+include unmanned aircraft systems (UAS), guidance and navigation, adaptive and
+data-driven control, and estimation.
+\end{biography}
+
+\begin{biography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{figs/author_placeholder.png}}]{Bohyun Chang}
+is with the Department of Aerospace Engineering, Korea Advanced Institute of Science
+and Technology (KAIST), Daejeon, South Korea. His research interests include
+guidance, navigation, and control of aerospace vehicles. (Detailed biography to be
+provided by the author.)
+\end{biography}
+
+\begin{biography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{figs/author_bang.jpg}}]{Hyochoong Bang}
+received his Ph.D. degree in aerospace engineering from Texas
+A\&M University in 1992. Since 2001, he has been with the Department of Aerospace
+Engineering, Korea Advanced Institute of Science and Technology (KAIST), Daejeon,
+South Korea, as a professor. His research interests include spacecraft guidance,
+attitude dynamics and control, unmanned aerial vehicle flight dynamics and control,
+and flight control system design.
+\end{biography}
+
+\bibliographystyle{IEEEtaes}
 \bibliography{references}
 
 \end{document}
